@@ -8,88 +8,106 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root"
-import { Route as TodosRouteImport } from "./routes/todos"
-import { Route as DashboardRouteImport } from "./routes/dashboard"
-import { Route as IndexRouteImport } from "./routes/index"
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocumentsDocumentIdRouteImport } from './routes/documents/$documentId'
 
-const TodosRoute = TodosRouteImport.update({
-	id: "/todos",
-	path: "/todos",
-	getParentRoute: () => rootRouteImport,
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
-	id: "/dashboard",
-	path: "/dashboard",
-	getParentRoute: () => rootRouteImport,
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
-	id: "/",
-	path: "/",
-	getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
+  id: '/documents/$documentId',
+  path: '/documents/$documentId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-	"/": typeof IndexRoute
-	"/dashboard": typeof DashboardRoute
-	"/todos": typeof TodosRoute
+  '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/settings': typeof SettingsRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRoutesByTo {
-	"/": typeof IndexRoute
-	"/dashboard": typeof DashboardRoute
-	"/todos": typeof TodosRoute
+  '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/settings': typeof SettingsRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRoutesById {
-	__root__: typeof rootRouteImport
-	"/": typeof IndexRoute
-	"/dashboard": typeof DashboardRoute
-	"/todos": typeof TodosRoute
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/settings': typeof SettingsRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRouteTypes {
-	fileRoutesByFullPath: FileRoutesByFullPath
-	fullPaths: "/" | "/dashboard" | "/todos"
-	fileRoutesByTo: FileRoutesByTo
-	to: "/" | "/dashboard" | "/todos"
-	id: "__root__" | "/" | "/dashboard" | "/todos"
-	fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/dashboard' | '/settings' | '/documents/$documentId'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/dashboard' | '/settings' | '/documents/$documentId'
+  id: '__root__' | '/' | '/dashboard' | '/settings' | '/documents/$documentId'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-	IndexRoute: typeof IndexRoute
-	DashboardRoute: typeof DashboardRoute
-	TodosRoute: typeof TodosRoute
+  IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
+  SettingsRoute: typeof SettingsRoute
+  DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
 }
 
-declare module "@tanstack/react-router" {
-	interface FileRoutesByPath {
-		"/todos": {
-			id: "/todos"
-			path: "/todos"
-			fullPath: "/todos"
-			preLoaderRoute: typeof TodosRouteImport
-			parentRoute: typeof rootRouteImport
-		}
-		"/dashboard": {
-			id: "/dashboard"
-			path: "/dashboard"
-			fullPath: "/dashboard"
-			preLoaderRoute: typeof DashboardRouteImport
-			parentRoute: typeof rootRouteImport
-		}
-		"/": {
-			id: "/"
-			path: "/"
-			fullPath: "/"
-			preLoaderRoute: typeof IndexRouteImport
-			parentRoute: typeof rootRouteImport
-		}
-	}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents/$documentId': {
+      id: '/documents/$documentId'
+      path: '/documents/$documentId'
+      fullPath: '/documents/$documentId'
+      preLoaderRoute: typeof DocumentsDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-	IndexRoute: IndexRoute,
-	DashboardRoute: DashboardRoute,
-	TodosRoute: TodosRoute,
+  IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
+  SettingsRoute: SettingsRoute,
+  DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
 }
 export const routeTree = rootRouteImport
-	._addFileChildren(rootRouteChildren)
-	._addFileTypes<FileRouteTypes>()
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
