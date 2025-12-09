@@ -1,7 +1,7 @@
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import UserMenu from "@/components/user-menu";
-import { api } from "@writerr/backend/convex/_generated/api";
+import { api } from "@writer/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	Authenticated,

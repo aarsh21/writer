@@ -1,6 +1,9 @@
 {
   "name": "@writer/backend",
   "version": "1.0.0",
+  "exports": {
+    "./convex/_generated/api": "./convex/_generated/api.js"
+  },
   "scripts": {
     "dev": "convex dev",
     "dev:setup": "convex dev --configure --until-success"

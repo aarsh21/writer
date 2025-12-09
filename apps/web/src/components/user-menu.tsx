@@ -10,7 +10,7 @@ import { authClient } from "@/lib/auth-client";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 import { useQuery } from "convex/react";
-import { api } from "@writerr/backend/convex/_generated/api";
+import { api } from "@writer/backend/convex/_generated/api";
 
 export default function UserMenu() {
 	const navigate = useNavigate();

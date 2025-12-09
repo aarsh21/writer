@@ -1,4 +1,4 @@
-# writerr
+# writer
 
 This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, Convex, and more.
 
@@ -49,7 +49,7 @@ Your app will connect to the Convex cloud backend automatically.
 ## Project Structure
 
 ```
-writerr/
+writer/
 ├── apps/
 │   ├── web/         # Frontend application (React + TanStack Router)
 ├── packages/
