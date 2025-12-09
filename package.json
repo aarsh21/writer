@@ -1,5 +1,5 @@
 {
-  "name": "writerr",
+  "name": "writer",
   "private": true,
   "type": "module",
   "workspaces": {
@@ -18,9 +18,9 @@
     "build": "turbo build",
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
-    "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F @writerr/backend dev",
-    "dev:setup": "turbo -F @writerr/backend dev:setup"
+    "dev:web": "turbo -F web dev:web",
+    "dev:server": "turbo -F @writer/backend dev",
+    "dev:setup": "turbo -F @writer/backend dev:setup"
   },
   "dependencies": {},
   "devDependencies": {
