@@ -2,8 +2,9 @@ import { createClient, type GenericCtx } from "@convex-dev/better-auth"
 import { convex } from "@convex-dev/better-auth/plugins"
 import { crossDomain } from "@convex-dev/better-auth/plugins"
 import { components } from "./_generated/api"
-import { DataModel } from "./_generated/dataModel"
+import type { DataModel } from "./_generated/dataModel"
 import { query } from "./_generated/server"
+import type { QueryCtx, MutationCtx } from "./_generated/server"
 import { betterAuth } from "better-auth"
 import { v } from "convex/values"
 
@@ -19,6 +20,18 @@ const trustedOrigins = [
 ].filter(Boolean)
 
 export const authComponent = createClient<DataModel>(components.betterAuth)
+
+/**
+ * Safely get the authenticated user, returning null if not authenticated
+ * Use this in queries that need to handle unauthenticated users gracefully
+ */
+export async function getAuthUserSafe(ctx: QueryCtx | MutationCtx) {
+	try {
+		return await authComponent.getAuthUser(ctx)
+	} catch {
+		return null
+	}
+}
 
 function createAuth(
 	ctx: GenericCtx<DataModel>,
@@ -44,6 +57,6 @@ export const getCurrentUser = query({
 	args: {},
 	returns: v.any(),
 	handler: async function (ctx, _args) {
-		return authComponent.getAuthUser(ctx)
+		return getAuthUserSafe(ctx)
 	},
 })

@@ -8,11 +8,19 @@
  * @module
  */
 
+import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
+import type * as collaborators from "../collaborators.js";
+import type * as documents from "../documents.js";
+import type * as exports from "../exports.js";
+import type * as folders from "../folders.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
+import type * as presence from "../presence.js";
 import type * as privateData from "../privateData.js";
-import type * as todos from "../todos.js";
+import type * as realtime from "../realtime.js";
+import type * as userPreferences from "../userPreferences.js";
+import type * as versions from "../versions.js";
 
 import type {
   ApiFromModules,
@@ -21,11 +29,19 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
   auth: typeof auth;
+  collaborators: typeof collaborators;
+  documents: typeof documents;
+  exports: typeof exports;
+  folders: typeof folders;
   healthCheck: typeof healthCheck;
   http: typeof http;
+  presence: typeof presence;
   privateData: typeof privateData;
-  todos: typeof todos;
+  realtime: typeof realtime;
+  userPreferences: typeof userPreferences;
+  versions: typeof versions;
 }>;
 
 /**
