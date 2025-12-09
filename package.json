@@ -17,6 +17,10 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev:web",
     "dev:server": "turbo -F @writer/backend dev",
@@ -24,6 +28,9 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "eslint-config-prettier": "^10.1.5",
+    "prettier": "^3.5.3",
+    "prettier-plugin-tailwindcss": "^0.6.11",
     "turbo": "^2.5.4"
   },
   "packageManager": "bun@1.3.4"

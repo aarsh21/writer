@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-import { api } from "@writer/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router"
+import { useQuery } from "convex/react"
+import { api } from "@writer/backend/convex/_generated/api"
 
 export const Route = createFileRoute("/")({
 	component: HomeComponent,
-});
+})
 
 const TITLE_TEXT = `
  ██████╗ ███████╗████████╗████████╗███████╗██████╗
@@ -20,10 +20,10 @@ const TITLE_TEXT = `
     ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
     ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
     ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
+ `
 
 function HomeComponent() {
-	const healthCheck = useQuery(api.healthCheck.get);
+	const healthCheck = useQuery(api.healthCheck.get)
 
 	return (
 		<div className="container mx-auto max-w-3xl px-4 py-2">
@@ -35,7 +35,7 @@ function HomeComponent() {
 						<div
 							className={`h-2 w-2 rounded-full ${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}`}
 						/>
-						<span className="text-sm text-muted-foreground">
+						<span className="text-muted-foreground text-sm">
 							{healthCheck === undefined
 								? "Checking..."
 								: healthCheck === "OK"
@@ -46,5 +46,5 @@ function HomeComponent() {
 				</section>
 			</div>
 		</div>
-	);
+	)
 }

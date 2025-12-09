@@ -5,16 +5,16 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "./ui/button";
-import { useQuery } from "convex/react";
-import { api } from "@writer/backend/convex/_generated/api";
+} from "@/components/ui/dropdown-menu"
+import { authClient } from "@/lib/auth-client"
+import { useNavigate } from "@tanstack/react-router"
+import { Button } from "./ui/button"
+import { useQuery } from "convex/react"
+import { api } from "@writer/backend/convex/_generated/api"
 
 export default function UserMenu() {
-	const navigate = useNavigate();
-	const user = useQuery(api.auth.getCurrentUser);
+	const navigate = useNavigate()
+	const user = useQuery(api.auth.getCurrentUser)
 
 	return (
 		<DropdownMenu>
@@ -35,10 +35,10 @@ export default function UserMenu() {
 									onSuccess: () => {
 										navigate({
 											to: "/dashboard",
-										});
+										})
 									},
 								},
-							});
+							})
 						}}
 					>
 						Sign Out
@@ -46,5 +46,5 @@ export default function UserMenu() {
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
-	);
+	)
 }

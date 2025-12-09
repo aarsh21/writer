@@ -1,48 +1,42 @@
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { createFileRoute } from "@tanstack/react-router"
+import { Loader2, Trash2 } from "lucide-react"
+import { useState } from "react"
 
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@writer/backend/convex/_generated/api";
-import type { Id } from "@writer/backend/convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@writer/backend/convex/_generated/api"
+import type { Id } from "@writer/backend/convex/_generated/dataModel"
 
 export const Route = createFileRoute("/todos")({
 	component: TodosRoute,
-});
+})
 
 function TodosRoute() {
-	const [newTodoText, setNewTodoText] = useState("");
+	const [newTodoText, setNewTodoText] = useState("")
 
-	const todos = useQuery(api.todos.getAll);
-	const createTodo = useMutation(api.todos.create);
-	const toggleTodo = useMutation(api.todos.toggle);
-	const deleteTodo = useMutation(api.todos.deleteTodo);
+	const todos = useQuery(api.todos.getAll)
+	const createTodo = useMutation(api.todos.create)
+	const toggleTodo = useMutation(api.todos.toggle)
+	const deleteTodo = useMutation(api.todos.deleteTodo)
 
 	const handleAddTodo = async (e: React.FormEvent) => {
-		e.preventDefault();
-		const text = newTodoText.trim();
-		if (!text) return;
-		await createTodo({ text });
-		setNewTodoText("");
-	};
+		e.preventDefault()
+		const text = newTodoText.trim()
+		if (!text) return
+		await createTodo({ text })
+		setNewTodoText("")
+	}
 
 	const handleToggleTodo = (id: Id<"todos">, currentCompleted: boolean) => {
-		toggleTodo({ id, completed: !currentCompleted });
-	};
+		toggleTodo({ id, completed: !currentCompleted })
+	}
 
 	const handleDeleteTodo = (id: Id<"todos">) => {
-		deleteTodo({ id });
-	};
+		deleteTodo({ id })
+	}
 
 	return (
 		<div className="mx-auto w-full max-w-md py-10">
@@ -52,10 +46,7 @@ function TodosRoute() {
 					<CardDescription>Manage your tasks efficiently</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<form
-						onSubmit={handleAddTodo}
-						className="mb-6 flex items-center space-x-2"
-					>
+					<form onSubmit={handleAddTodo} className="mb-6 flex items-center space-x-2">
 						<Input
 							value={newTodoText}
 							onChange={(e) => setNewTodoText(e.target.value)}
@@ -82,14 +73,12 @@ function TodosRoute() {
 									<div className="flex items-center space-x-2">
 										<Checkbox
 											checked={todo.completed}
-											onCheckedChange={() =>
-												handleToggleTodo(todo._id, todo.completed)
-											}
+											onCheckedChange={() => handleToggleTodo(todo._id, todo.completed)}
 											id={`todo-${todo._id}`}
 										/>
 										<label
 											htmlFor={`todo-${todo._id}`}
-											className={`${todo.completed ? "line-through text-muted-foreground" : ""}`}
+											className={`${todo.completed ? "text-muted-foreground line-through" : ""}`}
 										>
 											{todo.text}
 										</label>
@@ -109,5 +98,5 @@ function TodosRoute() {
 				</CardContent>
 			</Card>
 		</div>
-	);
+	)
 }

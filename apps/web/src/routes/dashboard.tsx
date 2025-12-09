@@ -1,23 +1,18 @@
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
-import UserMenu from "@/components/user-menu";
-import { api } from "@writer/backend/convex/_generated/api";
-import { createFileRoute } from "@tanstack/react-router";
-import {
-	Authenticated,
-	AuthLoading,
-	Unauthenticated,
-	useQuery,
-} from "convex/react";
-import { useState } from "react";
+import SignInForm from "@/components/sign-in-form"
+import SignUpForm from "@/components/sign-up-form"
+import UserMenu from "@/components/user-menu"
+import { api } from "@writer/backend/convex/_generated/api"
+import { createFileRoute } from "@tanstack/react-router"
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react"
+import { useState } from "react"
 
 export const Route = createFileRoute("/dashboard")({
 	component: RouteComponent,
-});
+})
 
 function RouteComponent() {
-	const [showSignIn, setShowSignIn] = useState(false);
-	const privateData = useQuery(api.privateData.get);
+	const [showSignIn, setShowSignIn] = useState(false)
+	const privateData = useQuery(api.privateData.get)
 
 	return (
 		<>
@@ -39,5 +34,5 @@ function RouteComponent() {
 				<div>Loading...</div>
 			</AuthLoading>
 		</>
-	);
+	)
 }
