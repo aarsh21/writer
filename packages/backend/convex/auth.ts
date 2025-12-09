@@ -9,6 +9,15 @@ import { v } from "convex/values";
 
 const siteUrl = process.env.SITE_URL!;
 
+// Frontend origins that are allowed to make cross-origin requests
+const trustedOrigins = [
+	siteUrl,
+	"http://localhost:3001",
+	"http://127.0.0.1:3001",
+	"tauri://localhost", // Tauri app
+	"https://tauri.localhost", // Tauri app (alternative)
+].filter(Boolean);
+
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 function createAuth(
@@ -19,7 +28,7 @@ function createAuth(
 		logger: {
 			disabled: optionsOnly,
 		},
-		trustedOrigins: [siteUrl],
+		trustedOrigins,
 		database: authComponent.adapter(ctx),
 		emailAndPassword: {
 			enabled: true,
