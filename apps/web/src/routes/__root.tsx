@@ -1,8 +1,20 @@
 import Header from "@/components/header"
 import { ThemeProvider } from "@/components/theme-provider"
+import { CommandPalette } from "@/components/command-palette"
 import { Toaster } from "@/components/ui/sonner"
-import { HeadContent, Outlet, createRootRouteWithContext } from "@tanstack/react-router"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import {
+	HeadContent,
+	Outlet,
+	createRootRouteWithContext,
+	useRouterState,
+} from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react"
+import { useState } from "react"
+import SignInForm from "@/components/sign-in-form"
+import SignUpForm from "@/components/sign-up-form"
 import "../index.css"
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -13,11 +25,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 	head: () => ({
 		meta: [
 			{
-				title: "writer",
+				title: "Writer",
 			},
 			{
 				name: "description",
-				content: "writer is a web application",
+				content: "A collaborative document editor",
 			},
 		],
 		links: [
@@ -30,6 +42,15 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 })
 
 function RootComponent() {
+	const routerState = useRouterState()
+	const currentPath = routerState.location.pathname
+
+	// Routes that use the sidebar layout (authenticated app routes)
+	const useSidebarLayout =
+		currentPath.startsWith("/documents") ||
+		currentPath.startsWith("/dashboard") ||
+		currentPath.startsWith("/settings")
+
 	return (
 		<>
 			<HeadContent />
@@ -39,13 +60,51 @@ function RootComponent() {
 				disableTransitionOnChange
 				storageKey="vite-ui-theme"
 			>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
-					<Outlet />
-				</div>
+				{useSidebarLayout ? (
+					<div className="h-svh">
+						<AuthenticatedLayout />
+					</div>
+				) : (
+					<div className="grid h-svh grid-rows-[auto_1fr]">
+						<Header />
+						<Outlet />
+					</div>
+				)}
+				<CommandPalette />
 				<Toaster richColors />
 			</ThemeProvider>
 			<TanStackRouterDevtools position="bottom-left" />
+		</>
+	)
+}
+
+function AuthenticatedLayout() {
+	const [showSignIn, setShowSignIn] = useState(false)
+
+	return (
+		<>
+			<Authenticated>
+				<SidebarProvider>
+					<AppSidebar />
+					<SidebarInset>
+						<Outlet />
+					</SidebarInset>
+				</SidebarProvider>
+			</Authenticated>
+			<Unauthenticated>
+				<div className="flex h-full items-center justify-center">
+					{showSignIn ? (
+						<SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+					) : (
+						<SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+					)}
+				</div>
+			</Unauthenticated>
+			<AuthLoading>
+				<div className="flex h-full items-center justify-center">
+					<div className="text-muted-foreground">Loading...</div>
+				</div>
+			</AuthLoading>
 		</>
 	)
 }
