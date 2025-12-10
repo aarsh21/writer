@@ -97,10 +97,7 @@ function DocumentEditor() {
 				<p className="text-muted-foreground">
 					This document may have been deleted or you don't have access to it.
 				</p>
-				<button
-					onClick={() => navigate({ to: "/dashboard" })}
-					className="text-primary hover:underline"
-				>
+				<button onClick={() => navigate({ to: "/" })} className="text-primary hover:underline">
 					Go back to dashboard
 				</button>
 			</div>

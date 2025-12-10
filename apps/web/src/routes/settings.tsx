@@ -50,7 +50,7 @@ function SettingsContent() {
 		authClient.signOut({
 			fetchOptions: {
 				onSuccess: () => {
-					navigate({ to: "/dashboard" })
+					navigate({ to: "/" })
 				},
 			},
 		})

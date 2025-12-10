@@ -99,7 +99,7 @@ export function AppSidebar() {
 				toast.success("Document deleted")
 				// If we deleted the current document, go to dashboard
 				if (currentDocumentId === documentToDelete.id) {
-					navigate({ to: "/dashboard" })
+					navigate({ to: "/" })
 				}
 			} catch {
 				toast.error("Failed to delete document")

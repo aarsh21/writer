@@ -118,7 +118,7 @@ export function DocumentHeader({
 		try {
 			await deleteDocument({ documentId })
 			toast.success("Document deleted")
-			navigate({ to: "/dashboard" })
+			navigate({ to: "/" })
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Failed to delete document")
 		}

@@ -12,7 +12,7 @@ import {
 	CommandSeparator,
 	CommandShortcut,
 } from "@/components/ui/command"
-import { FileText, Plus, Search, Settings, Moon, Sun, Home, Clock, Keyboard } from "lucide-react"
+import { FileText, Plus, Settings, Moon, Sun, Home, Clock, Keyboard } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 
 export function CommandPalette() {
@@ -100,7 +100,7 @@ export function CommandPalette() {
 						Create New Document
 						<CommandShortcut>{formatShortcut(newDocumentKey)}</CommandShortcut>
 					</CommandItem>
-					<CommandItem onSelect={() => runCommand(() => navigate({ to: "/dashboard" }))}>
+					<CommandItem onSelect={() => runCommand(() => navigate({ to: "/" }))}>
 						<Home className="mr-2 h-4 w-4" />
 						Go to Dashboard
 					</CommandItem>
@@ -149,35 +149,11 @@ export function CommandPalette() {
 					</CommandGroup>
 				)}
 
-				{/* All Documents (when no search) */}
-				{!search && documents && documents.length > 0 && (
-					<CommandGroup heading="All Documents">
-						{documents.slice(0, 5).map((doc) => (
-							<CommandItem
-								key={doc._id}
-								onSelect={() => runCommand(() => handleNavigateToDocument(doc._id))}
-							>
-								<FileText className="mr-2 h-4 w-4" />
-								<span className="flex-1 truncate">{doc.title || "Untitled"}</span>
-							</CommandItem>
-						))}
-						{documents.length > 5 && (
-							<CommandItem
-								onSelect={() => runCommand(() => navigate({ to: "/dashboard" }))}
-								className="text-muted-foreground"
-							>
-								<Search className="mr-2 h-4 w-4" />
-								View all {documents.length} documents...
-							</CommandItem>
-						)}
-					</CommandGroup>
-				)}
-
 				<CommandSeparator />
 
 				{/* Navigation */}
 				<CommandGroup heading="Navigation">
-					<CommandItem onSelect={() => runCommand(() => navigate({ to: "/dashboard" }))}>
+					<CommandItem onSelect={() => runCommand(() => navigate({ to: "/" }))}>
 						<Home className="mr-2 h-4 w-4" />
 						Dashboard
 					</CommandItem>
