@@ -17,7 +17,6 @@ import {
 	SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -148,70 +147,68 @@ export function AppSidebar() {
 				</SidebarHeader>
 
 				<SidebarContent>
-					<ScrollArea className="flex-1">
-						{/* Recent Documents */}
-						{recentDocuments && recentDocuments.length > 0 && (
-							<SidebarGroup>
-								<SidebarGroupLabel>
-									<Clock className="mr-2 h-4 w-4" />
-									Recent
-								</SidebarGroupLabel>
-								<SidebarGroupContent>
-									<SidebarMenu>
-										{recentDocuments.map((doc) => (
-											<DocumentMenuItem
-												key={doc._id}
-												document={doc}
-												isActive={currentDocumentId === doc._id}
-												onDelete={() => confirmDelete(doc._id, doc.title)}
-												onDuplicate={() => handleDuplicateDocument(doc._id)}
-												onRename={() => openRenameDialog(doc._id, doc.title)}
-											/>
-										))}
-									</SidebarMenu>
-								</SidebarGroupContent>
-							</SidebarGroup>
-						)}
-
-						<SidebarSeparator />
-
-						{/* All Documents */}
+					{/* Recent Documents */}
+					{recentDocuments && recentDocuments.length > 0 && (
 						<SidebarGroup>
 							<SidebarGroupLabel>
-								<FolderOpen className="mr-2 h-4 w-4" />
-								All Documents
+								<Clock className="mr-2 h-4 w-4" />
+								Recent
 							</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu>
-									{documents === undefined ? (
-										// Loading state
-										<>
-											<SidebarMenuSkeleton showIcon />
-											<SidebarMenuSkeleton showIcon />
-											<SidebarMenuSkeleton showIcon />
-										</>
-									) : documents.length === 0 ? (
-										<div className="text-muted-foreground px-2 py-4 text-center text-sm">
-											No documents yet.
-											<br />
-											Create your first document!
-										</div>
-									) : (
-										documents.map((doc) => (
-											<DocumentMenuItem
-												key={doc._id}
-												document={doc}
-												isActive={currentDocumentId === doc._id}
-												onDelete={() => confirmDelete(doc._id, doc.title)}
-												onDuplicate={() => handleDuplicateDocument(doc._id)}
-												onRename={() => openRenameDialog(doc._id, doc.title)}
-											/>
-										))
-									)}
+									{recentDocuments.map((doc) => (
+										<DocumentMenuItem
+											key={doc._id}
+											document={doc}
+											isActive={currentDocumentId === doc._id}
+											onDelete={() => confirmDelete(doc._id, doc.title)}
+											onDuplicate={() => handleDuplicateDocument(doc._id)}
+											onRename={() => openRenameDialog(doc._id, doc.title)}
+										/>
+									))}
 								</SidebarMenu>
 							</SidebarGroupContent>
 						</SidebarGroup>
-					</ScrollArea>
+					)}
+
+					<SidebarSeparator />
+
+					{/* All Documents */}
+					<SidebarGroup>
+						<SidebarGroupLabel>
+							<FolderOpen className="mr-2 h-4 w-4" />
+							All Documents
+						</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<SidebarMenu>
+								{documents === undefined ? (
+									// Loading state
+									<>
+										<SidebarMenuSkeleton showIcon />
+										<SidebarMenuSkeleton showIcon />
+										<SidebarMenuSkeleton showIcon />
+									</>
+								) : documents.length === 0 ? (
+									<div className="text-muted-foreground px-2 py-4 text-center text-sm">
+										No documents yet.
+										<br />
+										Create your first document!
+									</div>
+								) : (
+									documents.map((doc) => (
+										<DocumentMenuItem
+											key={doc._id}
+											document={doc}
+											isActive={currentDocumentId === doc._id}
+											onDelete={() => confirmDelete(doc._id, doc.title)}
+											onDuplicate={() => handleDuplicateDocument(doc._id)}
+											onRename={() => openRenameDialog(doc._id, doc.title)}
+										/>
+									))
+								)}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
 				</SidebarContent>
 
 				<SidebarFooter>
