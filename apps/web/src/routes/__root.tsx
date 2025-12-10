@@ -11,14 +11,15 @@ import {
 	useRouterState,
 } from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react"
+import { Authenticated, Unauthenticated, AuthLoading, useQuery } from "convex/react"
 import { useState } from "react"
 import SignInForm from "@/components/sign-in-form"
 import SignUpForm from "@/components/sign-up-form"
+import { api } from "@writer/backend/convex/_generated/api"
 import "../index.css"
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface RouterAppContext {}
+export type RouterAppContext = Record<string, never>
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
 	component: RootComponent,
@@ -85,12 +86,7 @@ function AuthenticatedLayout() {
 	return (
 		<>
 			<Authenticated>
-				<SidebarProvider>
-					<AppSidebar />
-					<SidebarInset>
-						<Outlet />
-					</SidebarInset>
-				</SidebarProvider>
+				<AuthenticatedSidebarLayout />
 			</Authenticated>
 			<Unauthenticated>
 				<div className="bg-background flex h-full items-center justify-center p-4">
@@ -107,5 +103,19 @@ function AuthenticatedLayout() {
 				</div>
 			</AuthLoading>
 		</>
+	)
+}
+
+function AuthenticatedSidebarLayout() {
+	const preferences = useQuery(api.userPreferences.getUserPreferences)
+	const sidebarShortcut = preferences?.keyboardShortcuts?.toggleSidebar || "b"
+
+	return (
+		<SidebarProvider shortcutKey={sidebarShortcut}>
+			<AppSidebar />
+			<SidebarInset>
+				<Outlet />
+			</SidebarInset>
+		</SidebarProvider>
 	)
 }
