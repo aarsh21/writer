@@ -152,8 +152,10 @@ export const getActiveUsers = query({
 			.withIndex("by_document", (q: any) => q.eq("documentId", args.documentId))
 			.collect()
 
-		// Filter out stale presence and current user
-		return presenceData.filter((p: any) => p.lastSeen > threshold && p.userId !== user._id)
+		// Filter out stale presence and current user, and exclude _creationTime
+		return presenceData
+			.filter((p) => p.lastSeen > threshold && p.userId !== user._id)
+			.map(({ _creationTime, ...rest }) => rest)
 	},
 })
 
