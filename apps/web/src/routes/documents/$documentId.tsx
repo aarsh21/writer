@@ -1,11 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useQuery, useMutation } from "convex/react"
-import { api } from "@writer/backend/convex/_generated/api"
+import { useMutation, useQuery } from "convex/react"
 import type { GenericId } from "convex/values"
-import { TiptapEditor } from "@/components/editor/tiptap-editor"
-import { DocumentHeader } from "@/components/documents/document-header"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useCallback, useEffect, useRef } from "react"
+
+import { api } from "@writer/backend/convex/_generated/api"
+
+import { DocumentHeader } from "@/components/documents/document-header"
+import { Editor } from "@/components/editor/editor"
+import { Toolbar } from "@/components/editor/toolbar"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const PRESENCE_HEARTBEAT_INTERVAL = 10 * 1000 // 10 seconds
 
 export const Route = createFileRoute("/documents/$documentId")({
 	component: DocumentEditor,
@@ -25,6 +30,8 @@ function DocumentEditor() {
 	const updateContent = useMutation(api.realtime.updateDocumentContent)
 	const updateTitle = useMutation(api.realtime.updateDocumentTitle)
 	const addToRecent = useMutation(api.userPreferences.addToRecentDocuments)
+	const updatePresence = useMutation(api.presence.updatePresence)
+	const removePresence = useMutation(api.presence.removePresence)
 
 	// Track the last saved content to avoid unnecessary saves
 	const lastSavedContent = useRef<string | null>(null)
@@ -35,7 +42,26 @@ function DocumentEditor() {
 		if (document) {
 			addToRecent({ documentId: docId })
 		}
-	}, [documentId, document, addToRecent, docId])
+	}, [document, addToRecent, docId])
+
+	// Presence tracking - update presence on mount and periodically
+	useEffect(() => {
+		if (!document) return
+
+		// Initial presence update
+		updatePresence({ documentId: docId })
+
+		// Set up heartbeat interval
+		const heartbeatInterval = setInterval(() => {
+			updatePresence({ documentId: docId })
+		}, PRESENCE_HEARTBEAT_INTERVAL)
+
+		// Cleanup: remove presence when leaving document
+		return () => {
+			clearInterval(heartbeatInterval)
+			removePresence({ documentId: docId })
+		}
+	}, [docId, document, updatePresence, removePresence])
 
 	// Initialize lastSavedContent when document loads
 	useEffect(() => {
@@ -97,7 +123,11 @@ function DocumentEditor() {
 				<p className="text-muted-foreground">
 					This document may have been deleted or you don't have access to it.
 				</p>
-				<button onClick={() => navigate({ to: "/" })} className="text-primary hover:underline">
+				<button
+					type="button"
+					onClick={() => navigate({ to: "/" })}
+					className="text-primary hover:underline"
+				>
 					Go back to dashboard
 				</button>
 			</div>
@@ -110,19 +140,16 @@ function DocumentEditor() {
 	}
 
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full flex-col overflow-hidden">
 			<DocumentHeader
 				documentId={docId}
 				title={document.title}
 				updatedAt={document.updatedAt}
 				onTitleChange={handleTitleUpdate}
 			/>
+			<Toolbar />
 			<div className="flex-1 overflow-hidden">
-				<TiptapEditor
-					content={document.content}
-					onUpdate={handleContentUpdate}
-					className="h-full"
-				/>
+				<Editor initialContent={document.content} onUpdate={handleContentUpdate} />
 			</div>
 		</div>
 	)
