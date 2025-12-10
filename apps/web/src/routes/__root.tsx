@@ -46,9 +46,10 @@ function RootComponent() {
 	const currentPath = routerState.location.pathname
 
 	// Routes that use the sidebar layout (authenticated app routes)
+	// "/" is the main dashboard, along with /documents and /settings
 	const useSidebarLayout =
+		currentPath === "/" ||
 		currentPath.startsWith("/documents") ||
-		currentPath.startsWith("/dashboard") ||
 		currentPath.startsWith("/settings")
 
 	return (
@@ -92,7 +93,7 @@ function AuthenticatedLayout() {
 				</SidebarProvider>
 			</Authenticated>
 			<Unauthenticated>
-				<div className="flex h-full items-center justify-center">
+				<div className="bg-background flex h-full items-center justify-center p-4">
 					{showSignIn ? (
 						<SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
 					) : (
