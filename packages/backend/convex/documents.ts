@@ -1,58 +1,42 @@
 import { v } from "convex/values"
+
+import type { Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
-import { getAuthUserSafe } from "./auth"
-import type { Id } from "./_generated/dataModel"
 
-// Helper to get authenticated user or throw (for mutations)
+import { getAuthUserSafe } from "./auth"
+
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) {
-		throw new Error("Unauthorized: User not authenticated")
-	}
+	if (!user) throw new Error("Unauthorized: User not authenticated")
 	return user
 }
 
-// Helper to check document access
 async function checkDocumentAccess(
 	ctx: QueryCtx | MutationCtx,
 	documentId: Id<"documents">,
 	userId: string,
 	requiredRole: "viewer" | "editor" | "owner" = "viewer",
 ) {
-	const document = await ctx.db.get(documentId)
-	if (!document || document.isDeleted) {
-		throw new Error("Document not found")
-	}
+	const document = await ctx.db.get("documents", documentId)
+	if (!document || document.isDeleted) throw new Error("Document not found")
 
-	// Owner always has access
-	if (document.ownerId === userId) {
-		return { document, role: "owner" as const }
-	}
+	if (document.ownerId === userId) return { document, role: "owner" as const }
 
-	// Check collaborator access
 	const collaborator = await ctx.db
 		.query("documentCollaborators")
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) {
-		throw new Error("Access denied: You don't have access to this document")
-	}
+	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
 
-	const roleHierarchy: Record<string, number> = {
-		viewer: 0,
-		editor: 1,
-		owner: 2,
-	}
+	const roleHierarchy: Record<string, number> = { viewer: 0, editor: 1, owner: 2 }
 	if (roleHierarchy[collaborator.role] < roleHierarchy[requiredRole]) {
 		throw new Error(`Access denied: ${requiredRole} role required`)
 	}
 
 	return { document, role: collaborator.role }
 }
-
-// ============ CREATE OPERATIONS ============
 
 export const createDocument = mutation({
 	args: {
@@ -63,23 +47,39 @@ export const createDocument = mutation({
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		const now = Date.now()
-		const documentId = await ctx.db.insert("documents", {
-			title: args.title || "Untitled Document",
-			content: args.content || JSON.stringify({ type: "doc", content: [] }),
+
+		// Generate smart default title if not provided
+		let title = args.title
+		if (!title) {
+			const date = new Date(now)
+			const month = date.toLocaleString("en-US", { month: "short" })
+			const day = date.getDate()
+			const year = date.getFullYear()
+
+			// Count existing documents created today to make unique names
+			const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+			const todayDocs = await ctx.db
+				.query("documents")
+				.withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+				.filter((q) => q.gte(q.field("createdAt"), startOfDay))
+				.collect()
+
+			const count = todayDocs.length + 1
+			title = count === 1 ? `${month} ${day}, ${year}` : `${month} ${day}, ${year} (${count})`
+		}
+
+		return ctx.db.insert("documents", {
+			title,
+			content: args.content ?? JSON.stringify({ type: "doc", content: [] }),
 			ownerId: user._id,
 			createdAt: now,
 			updatedAt: now,
 			isDeleted: false,
 			parentFolderId: args.parentFolderId,
 		})
-
-		return documentId
 	},
 })
-
-// ============ READ OPERATIONS ============
 
 export const getDocument = query({
 	args: {
@@ -103,12 +103,20 @@ export const getDocument = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return null
 
-		try {
-			const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
-			return document
-		} catch {
-			return null
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) return null
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return null
+
+		return document
 	},
 })
 
@@ -134,46 +142,33 @@ export const listDocuments = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return []
 
-		// Get owned documents
-		let ownedDocs = await ctx.db
+		const owned = await ctx.db
 			.query("documents")
 			.withIndex("by_owner", (q) => q.eq("ownerId", user._id))
 			.collect()
 
-		// Filter by folder if specified
-		if (args.folderId !== undefined) {
-			ownedDocs = ownedDocs.filter((doc) => doc.parentFolderId === args.folderId)
-		}
+		const filteredOwned = owned
+			.filter((doc) => args.folderId === undefined || doc.parentFolderId === args.folderId)
+			.filter((doc) => args.includeDeleted || !doc.isDeleted)
 
-		// Filter deleted documents unless explicitly requested
-		if (!args.includeDeleted) {
-			ownedDocs = ownedDocs.filter((doc) => !doc.isDeleted)
-		}
-
-		// Get shared documents
 		const collaborations = await ctx.db
 			.query("documentCollaborators")
 			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.collect()
 
-		const sharedDocIds = collaborations.map((c) => c.documentId)
-		const sharedDocs = await Promise.all(sharedDocIds.map((id) => ctx.db.get(id)))
-
-		let validSharedDocs = sharedDocs.filter(
-			(doc): doc is NonNullable<typeof doc> =>
-				doc !== null && (!doc.isDeleted || args.includeDeleted === true),
+		const shared = await Promise.all(
+			collaborations.map((c) => ctx.db.get("documents", c.documentId)),
 		)
 
-		// Filter shared docs by folder if specified
-		if (args.folderId !== undefined) {
-			validSharedDocs = validSharedDocs.filter((doc) => doc.parentFolderId === args.folderId)
-		}
+		const filteredShared = shared
+			.filter((doc): doc is NonNullable<typeof doc> => doc !== null)
+			.filter((doc) => args.includeDeleted || !doc.isDeleted)
+			.filter((doc) => args.folderId === undefined || doc.parentFolderId === args.folderId)
 
-		// Combine and sort by updatedAt
-		const allDocs = [...ownedDocs, ...validSharedDocs]
-		allDocs.sort((a, b) => b.updatedAt - a.updatedAt)
+		const all = [...filteredOwned, ...filteredShared]
+		all.sort((a, b) => b.updatedAt - a.updatedAt)
 
-		return allDocs
+		return all
 	},
 })
 
@@ -198,14 +193,12 @@ export const searchDocuments = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user || !args.searchQuery.trim()) return []
 
-		const results = await ctx.db
+		return ctx.db
 			.query("documents")
 			.withSearchIndex("search_title", (q) =>
 				q.search("title", args.searchQuery).eq("ownerId", user._id).eq("isDeleted", false),
 			)
 			.take(20)
-
-		return results
 	},
 })
 
@@ -230,19 +223,15 @@ export const getRecentDocuments = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return []
 
-		const limit = args.limit || 10
+		const count = args.limit ?? 10
 
-		const documents = await ctx.db
+		return ctx.db
 			.query("documents")
 			.withIndex("by_owner_deleted", (q) => q.eq("ownerId", user._id).eq("isDeleted", false))
 			.order("desc")
-			.take(limit)
-
-		return documents
+			.take(count)
 	},
 })
-
-// ============ UPDATE OPERATIONS ============
 
 export const updateDocument = mutation({
 	args: {
@@ -254,18 +243,14 @@ export const updateDocument = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
-		const updates: Record<string, unknown> = {
-			updatedAt: Date.now(),
-		}
-
+		const updates: Record<string, unknown> = { updatedAt: Date.now() }
 		if (args.title !== undefined) updates.title = args.title
 		if (args.content !== undefined) updates.content = args.content
 		if (args.parentFolderId !== undefined) updates.parentFolderId = args.parentFolderId
 
-		await ctx.db.patch(args.documentId, updates)
+		await ctx.db.patch("documents", args.documentId, updates)
 		return null
 	},
 })
@@ -278,18 +263,15 @@ export const renameDocument = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			title: args.title,
 			updatedAt: Date.now(),
 		})
 		return null
 	},
 })
-
-// ============ DELETE OPERATIONS ============
 
 export const deleteDocument = mutation({
 	args: {
@@ -298,11 +280,9 @@ export const deleteDocument = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id, "owner")
 
-		// Soft delete
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			isDeleted: true,
 			updatedAt: Date.now(),
 		})
@@ -318,16 +298,11 @@ export const restoreDocument = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		const document = await ctx.db.get(args.documentId)
-		if (!document) {
-			throw new Error("Document not found")
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document) throw new Error("Document not found")
+		if (document.ownerId !== user._id) throw new Error("Only the owner can restore a document")
 
-		if (document.ownerId !== user._id) {
-			throw new Error("Only the owner can restore a document")
-		}
-
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			isDeleted: false,
 			updatedAt: Date.now(),
 		})
@@ -343,62 +318,39 @@ export const permanentlyDeleteDocument = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		const document = await ctx.db.get(args.documentId)
-		if (!document) {
-			throw new Error("Document not found")
-		}
-
-		if (document.ownerId !== user._id) {
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document) throw new Error("Document not found")
+		if (document.ownerId !== user._id)
 			throw new Error("Only the owner can permanently delete a document")
-		}
 
-		// Delete all collaborators
 		const collaborators = await ctx.db
 			.query("documentCollaborators")
 			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
-
 		for (const collab of collaborators) {
-			await ctx.db.delete(collab._id)
+			await ctx.db.delete("documentCollaborators", collab._id)
 		}
 
-		// Delete all versions
 		const versions = await ctx.db
 			.query("documentVersions")
 			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
-
 		for (const version of versions) {
-			await ctx.db.delete(version._id)
+			await ctx.db.delete("documentVersions", version._id)
 		}
 
-		// Delete presence data
-		const presenceData = await ctx.db
+		const presence = await ctx.db
 			.query("userPresence")
 			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
-
-		for (const presence of presenceData) {
-			await ctx.db.delete(presence._id)
+		for (const p of presence) {
+			await ctx.db.delete("userPresence", p._id)
 		}
 
-		// Delete analytics
-		const analytics = await ctx.db
-			.query("documentAnalytics")
-			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-			.collect()
-
-		for (const analytic of analytics) {
-			await ctx.db.delete(analytic._id)
-		}
-
-		// Finally delete the document
-		await ctx.db.delete(args.documentId)
+		await ctx.db.delete("documents", args.documentId)
 		return null
 	},
 })
-
-// ============ DUPLICATE OPERATION ============
 
 export const duplicateDocument = mutation({
 	args: {
@@ -407,11 +359,10 @@ export const duplicateDocument = mutation({
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
-
 		const now = Date.now()
-		const newDocumentId = await ctx.db.insert("documents", {
+
+		return ctx.db.insert("documents", {
 			title: `${document.title} (Copy)`,
 			content: document.content,
 			ownerId: user._id,
@@ -420,12 +371,8 @@ export const duplicateDocument = mutation({
 			isDeleted: false,
 			parentFolderId: document.parentFolderId,
 		})
-
-		return newDocumentId
 	},
 })
-
-// ============ MOVE OPERATION ============
 
 export const moveDocument = mutation({
 	args: {
@@ -435,21 +382,93 @@ export const moveDocument = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
-		// Verify target folder exists and user owns it
 		if (args.targetFolderId) {
-			const folder = await ctx.db.get(args.targetFolderId)
+			const folder = await ctx.db.get("folders", args.targetFolderId)
 			if (!folder || folder.ownerId !== user._id) {
 				throw new Error("Target folder not found or access denied")
 			}
 		}
 
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			parentFolderId: args.targetFolderId,
 			updatedAt: Date.now(),
 		})
+		return null
+	},
+})
+
+export const getDeletedDocuments = query({
+	args: {},
+	returns: v.array(
+		v.object({
+			_id: v.id("documents"),
+			_creationTime: v.number(),
+			title: v.string(),
+			content: v.string(),
+			ownerId: v.string(),
+			createdAt: v.number(),
+			updatedAt: v.number(),
+			isDeleted: v.boolean(),
+			parentFolderId: v.optional(v.id("folders")),
+		}),
+	),
+	handler: async (ctx) => {
+		const user = await getAuthUserSafe(ctx)
+		if (!user) return []
+
+		return ctx.db
+			.query("documents")
+			.withIndex("by_owner_deleted", (q) => q.eq("ownerId", user._id).eq("isDeleted", true))
+			.order("desc")
+			.collect()
+	},
+})
+
+export const emptyTrash = mutation({
+	args: {},
+	returns: v.null(),
+	handler: async (ctx) => {
+		const user = await getAuthenticatedUser(ctx)
+
+		const deletedDocs = await ctx.db
+			.query("documents")
+			.withIndex("by_owner_deleted", (q) => q.eq("ownerId", user._id).eq("isDeleted", true))
+			.collect()
+
+		for (const doc of deletedDocs) {
+			// Delete collaborators
+			const collaborators = await ctx.db
+				.query("documentCollaborators")
+				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+				.collect()
+			for (const collab of collaborators) {
+				await ctx.db.delete("documentCollaborators", collab._id)
+			}
+
+			// Delete versions
+			const versions = await ctx.db
+				.query("documentVersions")
+				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+				.collect()
+			for (const version of versions) {
+				await ctx.db.delete("documentVersions", version._id)
+			}
+
+			// Delete presence
+			const presence = await ctx.db
+				.query("userPresence")
+				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+				.collect()
+			for (const p of presence) {
+				await ctx.db.delete("userPresence", p._id)
+			}
+
+			// Delete the document
+			await ctx.db.delete("documents", doc._id)
+		}
+
 		return null
 	},
 })

@@ -1,10 +1,9 @@
-import { CreateDocumentDialog } from "@/components/documents/create-document-dialog"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { api } from "@writer/backend/convex/_generated/api"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useQuery } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 import { FileText, Plus, Clock } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -15,10 +14,12 @@ export const Route = createFileRoute("/")({
 function DashboardContent() {
 	const documents = useQuery(api.documents.listDocuments, {})
 	const recentDocuments = useQuery(api.userPreferences.getRecentDocumentsWithData, { limit: 5 })
+	const createDocument = useMutation(api.documents.createDocument)
 	const navigate = useNavigate()
 
-	const handleDocumentCreated = (documentId: string) => {
-		navigate({ to: "/documents/$documentId", params: { documentId } })
+	const handleCreateDocument = async () => {
+		const docId = await createDocument({})
+		navigate({ to: "/documents/$documentId", params: { documentId: docId } })
 	}
 
 	return (
@@ -32,12 +33,12 @@ function DashboardContent() {
 				{documents === undefined ? (
 					<DashboardSkeleton />
 				) : documents.length === 0 ? (
-					<EmptyState onDocumentCreated={handleDocumentCreated} />
+					<EmptyState onCreateDocument={handleCreateDocument} />
 				) : (
 					<DocumentsOverview
 						documents={documents}
 						recentDocuments={recentDocuments}
-						onDocumentCreated={handleDocumentCreated}
+						onCreateDocument={handleCreateDocument}
 					/>
 				)}
 			</main>
@@ -45,7 +46,7 @@ function DashboardContent() {
 	)
 }
 
-function EmptyState({ onDocumentCreated }: { onDocumentCreated: (id: string) => void }) {
+function EmptyState({ onCreateDocument }: { onCreateDocument: () => void }) {
 	return (
 		<div className="flex h-full flex-col items-center justify-center gap-6">
 			<div className="bg-muted flex h-20 w-20 items-center justify-center rounded-full">
@@ -55,15 +56,10 @@ function EmptyState({ onDocumentCreated }: { onDocumentCreated: (id: string) => 
 				<h2 className="text-xl font-semibold">No documents yet</h2>
 				<p className="text-muted-foreground mt-1">Create your first document to get started</p>
 			</div>
-			<CreateDocumentDialog
-				trigger={
-					<Button size="lg" className="gap-2">
-						<Plus className="h-4 w-4" />
-						Create Document
-					</Button>
-				}
-				onCreated={onDocumentCreated}
-			/>
+			<Button size="lg" className="gap-2" onClick={onCreateDocument}>
+				<Plus className="h-4 w-4" />
+				Create Document
+			</Button>
 		</div>
 	)
 }
@@ -78,11 +74,11 @@ interface Document {
 function DocumentsOverview({
 	documents,
 	recentDocuments,
-	onDocumentCreated,
+	onCreateDocument,
 }: {
 	documents: Document[]
 	recentDocuments: Document[] | undefined
-	onDocumentCreated: (id: string) => void
+	onCreateDocument: () => void
 }) {
 	const navigate = useNavigate()
 
@@ -90,15 +86,10 @@ function DocumentsOverview({
 		<div className="space-y-8">
 			{/* Quick Actions */}
 			<div className="flex items-center gap-4">
-				<CreateDocumentDialog
-					trigger={
-						<Button className="gap-2">
-							<Plus className="h-4 w-4" />
-							New Document
-						</Button>
-					}
-					onCreated={onDocumentCreated}
-				/>
+				<Button className="gap-2" onClick={onCreateDocument}>
+					<Plus className="h-4 w-4" />
+					New Document
+				</Button>
 			</div>
 
 			{/* Recent Documents */}
@@ -154,6 +145,7 @@ function DocumentCard({ document, onClick }: { document: Document; onClick: () =
 
 	return (
 		<button
+			type="button"
 			onClick={onClick}
 			className="bg-card hover:bg-accent border-border flex flex-col gap-3 rounded-lg border p-4 text-left transition-colors"
 		>

@@ -85,14 +85,4 @@ export default defineSchema({
 			}),
 		),
 	}).index("by_user", ["userId"]),
-
-	// Document analytics - tracks views and edits
-	documentAnalytics: defineTable({
-		documentId: v.id("documents"),
-		userId: v.string(),
-		action: v.union(v.literal("view"), v.literal("edit")),
-		timestamp: v.number(),
-	})
-		.index("by_document", ["documentId"])
-		.index("by_user", ["userId"]),
 })

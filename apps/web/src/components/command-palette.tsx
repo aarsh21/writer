@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@writer/backend/convex/_generated/api"
+import type { Id } from "@writer/backend/convex/_generated/dataModel"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import {
 	CommandDialog,
@@ -12,18 +13,45 @@ import {
 	CommandSeparator,
 	CommandShortcut,
 } from "@/components/ui/command"
-import { FileText, Plus, Settings, Moon, Sun, Home, Clock, Keyboard } from "lucide-react"
+import { FileText, Plus, Settings, Moon, Sun, Home, Clock, Keyboard, Search } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
+
+// Debounce hook for search
+function useDebouncedValue<T>(value: T, delay: number): T {
+	const [debouncedValue, setDebouncedValue] = useState(value)
+
+	useEffect(() => {
+		const timer = setTimeout(() => setDebouncedValue(value), delay)
+		return () => clearTimeout(timer)
+	}, [value, delay])
+
+	return debouncedValue
+}
 
 export function CommandPalette() {
 	const [open, setOpen] = useState(false)
 	const [search, setSearch] = useState("")
+	const debouncedSearch = useDebouncedValue(search, 150)
 	const navigate = useNavigate()
 	const { theme, setTheme } = useTheme()
 	const routerState = useRouterState()
+	const currentPath = routerState.location.pathname
 
-	// Get documents for search
-	const documents = useQuery(api.documents.listDocuments, {})
+	// Get current document ID from URL to determine folder context
+	const documentIdMatch = currentPath.match(/^\/documents\/(.+)$/)
+	const currentDocumentId = documentIdMatch ? (documentIdMatch[1] as Id<"documents">) : undefined
+
+	// Get current document to know its folder
+	const currentDocument = useQuery(
+		api.documents.getDocument,
+		currentDocumentId ? { documentId: currentDocumentId } : "skip",
+	)
+
+	// Get documents for search - use full-text search when query exists
+	const searchResults = useQuery(
+		api.documents.searchDocuments,
+		debouncedSearch.trim() ? { searchQuery: debouncedSearch.trim() } : "skip",
+	)
 	const recentDocuments = useQuery(api.userPreferences.getRecentDocumentsWithData, { limit: 5 })
 	const preferences = useQuery(api.userPreferences.getUserPreferences)
 	const createDocument = useMutation(api.documents.createDocument)
@@ -31,6 +59,18 @@ export function CommandPalette() {
 	// Get configurable shortcuts with defaults
 	const commandPaletteKey = preferences?.keyboardShortcuts?.commandPalette || "k"
 	const newDocumentKey = preferences?.keyboardShortcuts?.newDocument || "n"
+
+	const runCommand = useCallback((command: () => void) => {
+		setOpen(false)
+		command()
+	}, [])
+
+	// Create document in current folder context
+	const handleCreateDocument = useCallback(async () => {
+		const folderId = currentDocument?.parentFolderId
+		const docId = await createDocument({ parentFolderId: folderId })
+		navigate({ to: "/documents/$documentId", params: { documentId: docId } })
+	}, [createDocument, navigate, currentDocument?.parentFolderId])
 
 	// Keyboard shortcut to open command palette
 	useEffect(() => {
@@ -48,7 +88,7 @@ export function CommandPalette() {
 
 		document.addEventListener("keydown", down)
 		return () => document.removeEventListener("keydown", down)
-	}, [commandPaletteKey, newDocumentKey])
+	}, [commandPaletteKey, newDocumentKey, handleCreateDocument])
 
 	// Reset search when dialog closes
 	useEffect(() => {
@@ -56,16 +96,6 @@ export function CommandPalette() {
 			setSearch("")
 		}
 	}, [open])
-
-	const runCommand = useCallback((command: () => void) => {
-		setOpen(false)
-		command()
-	}, [])
-
-	const handleCreateDocument = async () => {
-		const docId = await createDocument({})
-		navigate({ to: "/documents/$documentId", params: { documentId: docId } })
-	}
 
 	const handleNavigateToDocument = (documentId: string) => {
 		navigate({ to: "/documents/$documentId", params: { documentId } })
@@ -75,13 +105,11 @@ export function CommandPalette() {
 		setTheme(theme === "dark" ? "light" : "dark")
 	}
 
-	// Filter documents based on search
-	const filteredDocuments = documents?.filter((doc) =>
-		doc.title.toLowerCase().includes(search.toLowerCase()),
-	)
-
 	// Format shortcut for display
 	const formatShortcut = (key: string) => `⌘${key.toUpperCase()}`
+
+	// Check if we're actively searching
+	const isSearching = search.trim().length > 0
 
 	return (
 		<CommandDialog open={open} onOpenChange={setOpen} showCloseButton={false}>
@@ -97,7 +125,7 @@ export function CommandPalette() {
 				<CommandGroup heading="Quick Actions">
 					<CommandItem onSelect={() => runCommand(handleCreateDocument)}>
 						<Plus className="mr-2 h-4 w-4" />
-						Create New Document
+						New Document
 						<CommandShortcut>{formatShortcut(newDocumentKey)}</CommandShortcut>
 					</CommandItem>
 					<CommandItem onSelect={() => runCommand(() => navigate({ to: "/" }))}>
@@ -117,7 +145,7 @@ export function CommandPalette() {
 				<CommandSeparator />
 
 				{/* Recent Documents */}
-				{recentDocuments && recentDocuments.length > 0 && !search && (
+				{recentDocuments && recentDocuments.length > 0 && !isSearching && (
 					<>
 						<CommandGroup heading="Recent Documents">
 							{recentDocuments.slice(0, 5).map((doc) => (
@@ -135,14 +163,14 @@ export function CommandPalette() {
 				)}
 
 				{/* Search Results */}
-				{search && filteredDocuments && filteredDocuments.length > 0 && (
-					<CommandGroup heading="Documents">
-						{filteredDocuments.slice(0, 10).map((doc) => (
+				{isSearching && searchResults && searchResults.length > 0 && (
+					<CommandGroup heading="Search Results">
+						{searchResults.slice(0, 10).map((doc) => (
 							<CommandItem
 								key={doc._id}
 								onSelect={() => runCommand(() => handleNavigateToDocument(doc._id))}
 							>
-								<FileText className="mr-2 h-4 w-4" />
+								<Search className="mr-2 h-4 w-4" />
 								<span className="flex-1 truncate">{doc.title || "Untitled"}</span>
 							</CommandItem>
 						))}

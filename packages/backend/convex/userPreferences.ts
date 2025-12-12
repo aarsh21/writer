@@ -1,19 +1,17 @@
 import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
-import type { MutationCtx, QueryCtx } from "./_generated/server"
-import { getAuthUserSafe } from "./auth"
-import type { Id } from "./_generated/dataModel"
 
-// Helper to get authenticated user or throw
+import type { Doc, Id } from "./_generated/dataModel"
+import { mutation, query } from "./_generated/server"
+import type { MutationCtx } from "./_generated/server"
+
+import { getAuthUserSafe } from "./auth"
+
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) {
-		throw new Error("Unauthorized: User not authenticated")
-	}
+	if (!user) throw new Error("Unauthorized: User not authenticated")
 	return user
 }
 
-// Default preferences
 const DEFAULT_PREFERENCES = {
 	theme: "system" as string,
 	editorFontSize: 16,
@@ -26,16 +24,12 @@ const DEFAULT_PREFERENCES = {
 	},
 }
 
-// Keyboard shortcuts validator
 const keyboardShortcutsValidator = v.object({
 	toggleSidebar: v.optional(v.string()),
 	commandPalette: v.optional(v.string()),
 	newDocument: v.optional(v.string()),
 })
 
-/**
- * Get user preferences
- */
 export const getUserPreferences = query({
 	args: {},
 	returns: v.object({
@@ -52,49 +46,36 @@ export const getUserPreferences = query({
 	}),
 	handler: async (ctx) => {
 		const user = await getAuthUserSafe(ctx)
-		if (!user) {
-			return {
-				userId: "",
-				...DEFAULT_PREFERENCES,
-			}
-		}
+		if (!user) return { userId: "", ...DEFAULT_PREFERENCES }
 
 		const preferences = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
-		if (!preferences) {
-			return {
-				userId: user._id,
-				...DEFAULT_PREFERENCES,
-			}
-		}
+		if (!preferences) return { userId: user._id, ...DEFAULT_PREFERENCES }
 
 		return {
 			userId: user._id,
-			theme: preferences.theme || DEFAULT_PREFERENCES.theme,
-			editorFontSize: preferences.editorFontSize || DEFAULT_PREFERENCES.editorFontSize,
-			editorLineHeight: preferences.editorLineHeight || DEFAULT_PREFERENCES.editorLineHeight,
-			recentDocuments: preferences.recentDocuments || DEFAULT_PREFERENCES.recentDocuments,
+			theme: preferences.theme ?? DEFAULT_PREFERENCES.theme,
+			editorFontSize: preferences.editorFontSize ?? DEFAULT_PREFERENCES.editorFontSize,
+			editorLineHeight: preferences.editorLineHeight ?? DEFAULT_PREFERENCES.editorLineHeight,
+			recentDocuments: preferences.recentDocuments ?? DEFAULT_PREFERENCES.recentDocuments,
 			keyboardShortcuts: {
 				toggleSidebar:
-					preferences.keyboardShortcuts?.toggleSidebar ||
+					preferences.keyboardShortcuts?.toggleSidebar ??
 					DEFAULT_PREFERENCES.keyboardShortcuts.toggleSidebar,
 				commandPalette:
-					preferences.keyboardShortcuts?.commandPalette ||
+					preferences.keyboardShortcuts?.commandPalette ??
 					DEFAULT_PREFERENCES.keyboardShortcuts.commandPalette,
 				newDocument:
-					preferences.keyboardShortcuts?.newDocument ||
+					preferences.keyboardShortcuts?.newDocument ??
 					DEFAULT_PREFERENCES.keyboardShortcuts.newDocument,
 			},
 		}
 	},
 })
 
-/**
- * Update user preferences
- */
 export const updateUserPreferences = mutation({
 	args: {
 		theme: v.optional(v.string()),
@@ -108,38 +89,28 @@ export const updateUserPreferences = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
-		const updates: Record<string, any> = {}
+		const updates: Record<string, unknown> = {}
 		if (args.theme !== undefined) updates.theme = args.theme
 		if (args.editorFontSize !== undefined) updates.editorFontSize = args.editorFontSize
 		if (args.editorLineHeight !== undefined) updates.editorLineHeight = args.editorLineHeight
 		if (args.keyboardShortcuts !== undefined) {
-			// Merge with existing shortcuts
-			const existingShortcuts = existing?.keyboardShortcuts || {}
-			updates.keyboardShortcuts = {
-				...existingShortcuts,
-				...args.keyboardShortcuts,
-			}
+			const existingShortcuts = existing?.keyboardShortcuts ?? {}
+			updates.keyboardShortcuts = { ...existingShortcuts, ...args.keyboardShortcuts }
 		}
 
 		if (existing) {
-			await ctx.db.patch(existing._id, updates)
+			await ctx.db.patch("userPreferences", existing._id, updates)
 		} else {
-			await ctx.db.insert("userPreferences", {
-				userId: user._id,
-				...updates,
-			})
+			await ctx.db.insert("userPreferences", { userId: user._id, ...updates })
 		}
 
 		return null
 	},
 })
 
-/**
- * Add a document to recent documents list
- */
 export const addToRecentDocuments = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -150,26 +121,17 @@ export const addToRecentDocuments = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
 		const MAX_RECENT = 10
 
 		if (existing) {
-			let recentDocs = existing.recentDocuments || []
+			const recent = (existing.recentDocuments ?? []).filter((id) => id !== args.documentId)
+			recent.unshift(args.documentId)
+			const trimmed = recent.slice(0, MAX_RECENT)
 
-			// Remove if already in list
-			recentDocs = recentDocs.filter((id: Id<"documents">) => id !== args.documentId)
-
-			// Add to front
-			recentDocs.unshift(args.documentId)
-
-			// Trim to max
-			recentDocs = recentDocs.slice(0, MAX_RECENT)
-
-			await ctx.db.patch(existing._id, {
-				recentDocuments: recentDocs,
-			})
+			await ctx.db.patch("userPreferences", existing._id, { recentDocuments: trimmed })
 		} else {
 			await ctx.db.insert("userPreferences", {
 				userId: user._id,
@@ -181,9 +143,6 @@ export const addToRecentDocuments = mutation({
 	},
 })
 
-/**
- * Remove a document from recent documents list
- */
 export const removeFromRecentDocuments = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -194,26 +153,18 @@ export const removeFromRecentDocuments = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
-		if (existing && existing.recentDocuments) {
-			const recentDocs = existing.recentDocuments.filter(
-				(id: Id<"documents">) => id !== args.documentId,
-			)
-
-			await ctx.db.patch(existing._id, {
-				recentDocuments: recentDocs,
-			})
+		if (existing?.recentDocuments) {
+			const recent = existing.recentDocuments.filter((id) => id !== args.documentId)
+			await ctx.db.patch("userPreferences", existing._id, { recentDocuments: recent })
 		}
 
 		return null
 	},
 })
 
-/**
- * Clear recent documents list
- */
 export const clearRecentDocuments = mutation({
 	args: {},
 	returns: v.null(),
@@ -222,22 +173,17 @@ export const clearRecentDocuments = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
 		if (existing) {
-			await ctx.db.patch(existing._id, {
-				recentDocuments: [],
-			})
+			await ctx.db.patch("userPreferences", existing._id, { recentDocuments: [] })
 		}
 
 		return null
 	},
 })
 
-/**
- * Get recent documents with full document data
- */
 export const getRecentDocumentsWithData = query({
 	args: {
 		limit: v.optional(v.number()),
@@ -259,31 +205,26 @@ export const getRecentDocumentsWithData = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return []
 
-		const limit = args.limit || 10
+		const count = args.limit ?? 10
 
 		const preferences = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
-		if (!preferences || !preferences.recentDocuments) {
-			return []
-		}
+		if (!preferences?.recentDocuments) return []
 
 		const documents = await Promise.all(
-			preferences.recentDocuments.slice(0, limit).map(async (docId: Id<"documents">) => {
-				const doc = await ctx.db.get(docId)
+			preferences.recentDocuments.slice(0, count).map(async (docId) => {
+				const doc = await ctx.db.get("documents", docId)
 				return doc && !doc.isDeleted ? doc : null
 			}),
 		)
 
-		return documents.filter(Boolean) as any[]
+		return documents.filter((doc): doc is Doc<"documents"> => doc !== null)
 	},
 })
 
-/**
- * Reset all preferences to defaults
- */
 export const resetPreferences = mutation({
 	args: {},
 	returns: v.null(),
@@ -292,16 +233,15 @@ export const resetPreferences = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
 		if (existing) {
-			await ctx.db.patch(existing._id, {
+			await ctx.db.patch("userPreferences", existing._id, {
 				theme: DEFAULT_PREFERENCES.theme,
 				editorFontSize: DEFAULT_PREFERENCES.editorFontSize,
 				editorLineHeight: DEFAULT_PREFERENCES.editorLineHeight,
 				keyboardShortcuts: DEFAULT_PREFERENCES.keyboardShortcuts,
-				// Keep recent documents
 			})
 		}
 
@@ -309,9 +249,6 @@ export const resetPreferences = mutation({
 	},
 })
 
-/**
- * Update keyboard shortcuts
- */
 export const updateKeyboardShortcuts = mutation({
 	args: {
 		toggleSidebar: v.optional(v.string()),
@@ -324,10 +261,10 @@ export const updateKeyboardShortcuts = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
-		const existingShortcuts = existing?.keyboardShortcuts || DEFAULT_PREFERENCES.keyboardShortcuts
+		const existingShortcuts = existing?.keyboardShortcuts ?? DEFAULT_PREFERENCES.keyboardShortcuts
 		const newShortcuts = {
 			toggleSidebar: args.toggleSidebar ?? existingShortcuts.toggleSidebar,
 			commandPalette: args.commandPalette ?? existingShortcuts.commandPalette,
@@ -335,23 +272,15 @@ export const updateKeyboardShortcuts = mutation({
 		}
 
 		if (existing) {
-			await ctx.db.patch(existing._id, {
-				keyboardShortcuts: newShortcuts,
-			})
+			await ctx.db.patch("userPreferences", existing._id, { keyboardShortcuts: newShortcuts })
 		} else {
-			await ctx.db.insert("userPreferences", {
-				userId: user._id,
-				keyboardShortcuts: newShortcuts,
-			})
+			await ctx.db.insert("userPreferences", { userId: user._id, keyboardShortcuts: newShortcuts })
 		}
 
 		return null
 	},
 })
 
-/**
- * Set theme preference
- */
 export const setTheme = mutation({
 	args: {
 		theme: v.union(v.literal("light"), v.literal("dark"), v.literal("system")),
@@ -362,27 +291,19 @@ export const setTheme = mutation({
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
 		if (existing) {
-			await ctx.db.patch(existing._id, {
-				theme: args.theme,
-			})
+			await ctx.db.patch("userPreferences", existing._id, { theme: args.theme })
 		} else {
-			await ctx.db.insert("userPreferences", {
-				userId: user._id,
-				theme: args.theme,
-			})
+			await ctx.db.insert("userPreferences", { userId: user._id, theme: args.theme })
 		}
 
 		return null
 	},
 })
 
-/**
- * Set editor font size
- */
 export const setEditorFontSize = mutation({
 	args: {
 		fontSize: v.number(),
@@ -391,25 +312,19 @@ export const setEditorFontSize = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		// Validate font size (12-24)
 		if (args.fontSize < 12 || args.fontSize > 24) {
 			throw new Error("Font size must be between 12 and 24")
 		}
 
 		const existing = await ctx.db
 			.query("userPreferences")
-			.withIndex("by_user", (q: any) => q.eq("userId", user._id))
+			.withIndex("by_user", (q) => q.eq("userId", user._id))
 			.unique()
 
 		if (existing) {
-			await ctx.db.patch(existing._id, {
-				editorFontSize: args.fontSize,
-			})
+			await ctx.db.patch("userPreferences", existing._id, { editorFontSize: args.fontSize })
 		} else {
-			await ctx.db.insert("userPreferences", {
-				userId: user._id,
-				editorFontSize: args.fontSize,
-			})
+			await ctx.db.insert("userPreferences", { userId: user._id, editorFontSize: args.fontSize })
 		}
 
 		return null

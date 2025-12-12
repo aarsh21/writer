@@ -1,45 +1,36 @@
 import { createClient, type GenericCtx } from "@convex-dev/better-auth"
-import { convex } from "@convex-dev/better-auth/plugins"
-import { crossDomain } from "@convex-dev/better-auth/plugins"
-import { components } from "./_generated/api"
-import type { DataModel } from "./_generated/dataModel"
-import { query } from "./_generated/server"
-import type { QueryCtx, MutationCtx } from "./_generated/server"
+import { convex, crossDomain } from "@convex-dev/better-auth/plugins"
 import { betterAuth } from "better-auth"
 import { v } from "convex/values"
 
-const siteUrl = process.env.SITE_URL!
+import { components } from "./_generated/api"
+import type { DataModel } from "./_generated/dataModel"
+import { query } from "./_generated/server"
+import type { MutationCtx, QueryCtx } from "./_generated/server"
 
-// Frontend origins that are allowed to make cross-origin requests
+const siteUrl = process.env.SITE_URL ?? ""
+
 const trustedOrigins = [
 	siteUrl,
 	"http://localhost:3001",
 	"http://127.0.0.1:3001",
-	"tauri://localhost", // Tauri app
-	"https://tauri.localhost", // Tauri app (alternative)
+	"tauri://localhost",
+	"https://tauri.localhost",
 ].filter(Boolean)
 
 export const authComponent = createClient<DataModel>(components.betterAuth)
 
-/**
- * Safely get the authenticated user, returning null if not authenticated
- * Use this in queries that need to handle unauthenticated users gracefully
- */
 export async function getAuthUserSafe(ctx: QueryCtx | MutationCtx) {
-	try {
-		return await authComponent.getAuthUser(ctx)
-	} catch {
-		return null
-	}
+	return authComponent.getAuthUser(ctx).catch(() => null)
 }
 
 function createAuth(
 	ctx: GenericCtx<DataModel>,
-	{ optionsOnly }: { optionsOnly?: boolean } = { optionsOnly: false },
+	options: { optionsOnly?: boolean } = { optionsOnly: false },
 ) {
 	return betterAuth({
 		logger: {
-			disabled: optionsOnly,
+			disabled: options.optionsOnly,
 		},
 		trustedOrigins,
 		database: authComponent.adapter(ctx),
@@ -56,7 +47,5 @@ export { createAuth }
 export const getCurrentUser = query({
 	args: {},
 	returns: v.any(),
-	handler: async function (ctx, _args) {
-		return getAuthUserSafe(ctx)
-	},
+	handler: async (ctx) => getAuthUserSafe(ctx),
 })

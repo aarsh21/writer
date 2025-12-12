@@ -1,49 +1,37 @@
 import { v } from "convex/values"
+
+import type { Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
-import { getAuthUserSafe } from "./auth"
-import type { Id } from "./_generated/dataModel"
 
-// Helper to get authenticated user or throw (for mutations)
+import { getAuthUserSafe } from "./auth"
+
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) {
-		throw new Error("Unauthorized: User not authenticated")
-	}
+	if (!user) throw new Error("Unauthorized: User not authenticated")
 	return user
 }
 
-// Helper to check document access
 async function checkDocumentAccess(
 	ctx: QueryCtx | MutationCtx,
 	documentId: Id<"documents">,
 	userId: string,
 ) {
-	const document = await ctx.db.get(documentId)
-	if (!document || document.isDeleted) {
-		throw new Error("Document not found")
-	}
+	const document = await ctx.db.get("documents", documentId)
+	if (!document || document.isDeleted) throw new Error("Document not found")
 
-	if (document.ownerId === userId) {
-		return { document, role: "owner" as const }
-	}
+	if (document.ownerId === userId) return { document, role: "owner" as const }
 
 	const collaborator = await ctx.db
 		.query("documentCollaborators")
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) {
-		throw new Error("Access denied")
-	}
+	if (!collaborator) throw new Error("Access denied")
 
 	return { document, role: collaborator.role }
 }
 
-/**
- * Subscribe to document content - this query will re-run whenever the document changes
- * Use this with Convex's useQuery for real-time updates
- */
 export const subscribeToDocument = query({
 	args: {
 		documentId: v.id("documents"),
@@ -66,19 +54,23 @@ export const subscribeToDocument = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return null
 
-		try {
-			const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
-			return document
-		} catch {
-			return null
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) return null
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return null
+
+		return document
 	},
 })
 
-/**
- * Update document content - optimized for real-time collaborative editing
- * This mutation is designed to be called frequently (debounced on client side)
- */
 export const updateDocumentContent = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -90,11 +82,10 @@ export const updateDocumentContent = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id)
 
 		const now = Date.now()
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			content: args.content,
 			updatedAt: now,
 		})
@@ -103,9 +94,6 @@ export const updateDocumentContent = mutation({
 	},
 })
 
-/**
- * Update document title - separate from content for more granular updates
- */
 export const updateDocumentTitle = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -117,11 +105,10 @@ export const updateDocumentTitle = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id)
 
 		const now = Date.now()
-		await ctx.db.patch(args.documentId, {
+		await ctx.db.patch("documents", args.documentId, {
 			title: args.title,
 			updatedAt: now,
 		})
@@ -130,10 +117,6 @@ export const updateDocumentTitle = mutation({
 	},
 })
 
-/**
- * Batch update - update both title and content in one mutation
- * Useful for autosave functionality
- */
 export const batchUpdateDocument = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -146,24 +129,19 @@ export const batchUpdateDocument = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		await checkDocumentAccess(ctx, args.documentId, user._id)
 
 		const now = Date.now()
 		const updates: Record<string, unknown> = { updatedAt: now }
-
 		if (args.title !== undefined) updates.title = args.title
 		if (args.content !== undefined) updates.content = args.content
 
-		await ctx.db.patch(args.documentId, updates)
+		await ctx.db.patch("documents", args.documentId, updates)
 
 		return { success: true, updatedAt: now }
 	},
 })
 
-/**
- * Get document metadata without content - useful for document lists
- */
 export const getDocumentMetadata = query({
 	args: {
 		documentId: v.id("documents"),
@@ -184,27 +162,31 @@ export const getDocumentMetadata = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return null
 
-		try {
-			const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
-			return {
-				_id: document._id,
-				title: document.title,
-				ownerId: document.ownerId,
-				createdAt: document.createdAt,
-				updatedAt: document.updatedAt,
-				isDeleted: document.isDeleted,
-				parentFolderId: document.parentFolderId,
-			}
-		} catch {
-			return null
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) return null
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return null
+
+		return {
+			_id: document._id,
+			title: document.title,
+			ownerId: document.ownerId,
+			createdAt: document.createdAt,
+			updatedAt: document.updatedAt,
+			isDeleted: document.isDeleted,
+			parentFolderId: document.parentFolderId,
 		}
 	},
 })
 
-/**
- * Check if document has been updated since a given timestamp
- * Useful for conflict detection
- */
 export const checkDocumentVersion = query({
 	args: {
 		documentId: v.id("documents"),
@@ -216,14 +198,10 @@ export const checkDocumentVersion = query({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthUserSafe(ctx)
-		if (!user) {
-			return { hasChanged: false, currentUpdatedAt: 0 }
-		}
+		if (!user) return { hasChanged: false, currentUpdatedAt: 0 }
 
-		const document = await ctx.db.get(args.documentId)
-		if (!document) {
-			return { hasChanged: false, currentUpdatedAt: 0 }
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document) return { hasChanged: false, currentUpdatedAt: 0 }
 
 		return {
 			hasChanged: document.updatedAt > args.lastKnownUpdate,

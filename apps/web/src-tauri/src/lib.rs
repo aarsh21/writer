@@ -40,7 +40,7 @@ pub fn run() {
 
                     // Adjust zoom for better readability on Linux in debug mode
                     if cfg!(debug_assertions) {
-                        let _ = window.set_zoom(1.3);
+                        let _ = window.set_zoom(1.0);
                     }
                 }
             }

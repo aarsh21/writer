@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import type { GenericId } from "convex/values"
+import type { Id } from "@writer/backend/convex/_generated/dataModel"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@writer/backend/convex/_generated/api"
 import { useNavigate } from "@tanstack/react-router"
@@ -43,10 +43,10 @@ import { cn } from "@/lib/utils"
 import { ShareDocumentDialog } from "./share-document-dialog"
 import { ExportDocumentDialog } from "./export-document-dialog"
 import { RenameDocumentDialog } from "./rename-document-dialog"
+import { VersionHistoryDialog } from "./version-history-dialog"
 import { toast } from "sonner"
 
-// Use GenericId for document IDs
-type DocumentId = GenericId<"documents">
+type DocumentId = Id<"documents">
 
 interface DocumentHeaderProps {
 	documentId: DocumentId
@@ -71,13 +71,13 @@ export function DocumentHeader({
 	const [exportDialogOpen, setExportDialogOpen] = useState(false)
 	const [renameDialogOpen, setRenameDialogOpen] = useState(false)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
 	// Mutations
 	const deleteDocument = useMutation(api.documents.deleteDocument)
 	const duplicateDocument = useMutation(api.documents.duplicateDocument)
 
-	// Get collaborators for avatar display
-	const collaborators = useQuery(api.collaborators.listCollaborators, { documentId })
+	// Get active users for avatar display
 	const activeUsers = useQuery(api.presence.getActiveUsers, { documentId })
 
 	// Update edit value when title changes externally
@@ -135,7 +135,6 @@ export function DocumentHeader({
 		}
 	}
 
-	// Get unique active users (excluding current user placeholder)
 	const activeUsersList = activeUsers || []
 
 	return (
@@ -160,6 +159,7 @@ export function DocumentHeader({
 					/>
 				) : (
 					<button
+						type="button"
 						onClick={() => setIsEditing(true)}
 						className={cn(
 							"text-foreground max-w-md truncate text-lg font-semibold",
@@ -261,7 +261,7 @@ export function DocumentHeader({
 								<Copy className="mr-2 h-4 w-4" />
 								Duplicate
 							</DropdownMenuItem>
-							<DropdownMenuItem>
+							<DropdownMenuItem onClick={() => setVersionHistoryOpen(true)}>
 								<History className="mr-2 h-4 w-4" />
 								Version History
 							</DropdownMenuItem>
@@ -307,6 +307,13 @@ export function DocumentHeader({
 				currentTitle={title}
 			/>
 
+			{/* Version History Dialog */}
+			<VersionHistoryDialog
+				open={versionHistoryOpen}
+				onOpenChange={setVersionHistoryOpen}
+				documentId={documentId}
+			/>
+
 			{/* Delete Confirmation Dialog */}
 			<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<AlertDialogContent>
@@ -331,7 +338,6 @@ export function DocumentHeader({
 	)
 }
 
-// Helper function to generate consistent colors for avatars
 function getColorForIndex(index: number): string {
 	const colors = [
 		"#ef4444", // red

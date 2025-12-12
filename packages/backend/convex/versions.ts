@@ -1,54 +1,40 @@
 import { v } from "convex/values"
-import { mutation, query, internalMutation } from "./_generated/server"
-import type { MutationCtx, QueryCtx } from "./_generated/server"
-import { getAuthUserSafe } from "./auth"
-import type { Id } from "./_generated/dataModel"
 
-// Helper to get authenticated user or throw
+import type { Doc, Id } from "./_generated/dataModel"
+import { internalMutation, mutation, query } from "./_generated/server"
+import type { MutationCtx, QueryCtx } from "./_generated/server"
+
+import { getAuthUserSafe } from "./auth"
+
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) {
-		throw new Error("Unauthorized: User not authenticated")
-	}
+	if (!user) throw new Error("Unauthorized: User not authenticated")
 	return user
 }
 
-// Helper to check document access
 async function checkDocumentAccess(
 	ctx: QueryCtx | MutationCtx,
 	documentId: Id<"documents">,
 	userId: string,
 ) {
-	const document = await ctx.db.get(documentId)
-	if (!document || document.isDeleted) {
-		throw new Error("Document not found")
-	}
+	const document = await ctx.db.get("documents", documentId)
+	if (!document || document.isDeleted) throw new Error("Document not found")
 
-	if (document.ownerId === userId) {
-		return { document, role: "owner" as const }
-	}
+	if (document.ownerId === userId) return { document, role: "owner" as const }
 
 	const collaborator = await ctx.db
 		.query("documentCollaborators")
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) {
-		throw new Error("Access denied")
-	}
+	if (!collaborator) throw new Error("Access denied")
 
 	return { document, role: collaborator.role }
 }
 
-// Maximum versions to keep per document
 const MAX_VERSIONS = 50
-
-// Minimum time between auto-saves (5 minutes)
 const MIN_VERSION_INTERVAL = 5 * 60 * 1000
 
-/**
- * Create a new version snapshot
- */
 export const createVersion = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -56,7 +42,6 @@ export const createVersion = mutation({
 	returns: v.id("documentVersions"),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
 
 		const versionId = await ctx.db.insert("documentVersions", {
@@ -67,18 +52,16 @@ export const createVersion = mutation({
 			createdBy: user._id,
 		})
 
-		// Cleanup old versions if exceeding limit
-		const allVersions = await ctx.db
+		const all = await ctx.db
 			.query("documentVersions")
-			.withIndex("by_document", (q: any) => q.eq("documentId", args.documentId))
+			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
 
-		if (allVersions.length > MAX_VERSIONS) {
-			// Sort by createdAt and delete oldest
-			allVersions.sort((a: any, b: any) => a.createdAt - b.createdAt)
-			const toDelete = allVersions.slice(0, allVersions.length - MAX_VERSIONS)
+		if (all.length > MAX_VERSIONS) {
+			const sorted = [...all].sort((a, b) => a.createdAt - b.createdAt)
+			const toDelete = sorted.slice(0, all.length - MAX_VERSIONS)
 			for (const version of toDelete) {
-				await ctx.db.delete(version._id)
+				await ctx.db.delete("documentVersions", version._id)
 			}
 		}
 
@@ -86,10 +69,6 @@ export const createVersion = mutation({
 	},
 })
 
-/**
- * Auto-create version if enough time has passed
- * Returns true if a version was created
- */
 export const autoCreateVersion = mutation({
 	args: {
 		documentId: v.id("documents"),
@@ -97,21 +76,18 @@ export const autoCreateVersion = mutation({
 	returns: v.boolean(),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-
 		const { document } = await checkDocumentAccess(ctx, args.documentId, user._id)
 
-		// Get the most recent version
 		const versions = await ctx.db
 			.query("documentVersions")
-			.withIndex("by_document", (q: any) => q.eq("documentId", args.documentId))
+			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
 
-		const latestVersion = versions.sort((a: any, b: any) => b.createdAt - a.createdAt)[0]
-
+		const sorted = [...versions].sort((a, b) => b.createdAt - a.createdAt)
+		const latest = sorted[0]
 		const now = Date.now()
 
-		// Only create if no versions exist or enough time has passed
-		if (!latestVersion || now - latestVersion.createdAt >= MIN_VERSION_INTERVAL) {
+		if (!latest || now - latest.createdAt >= MIN_VERSION_INTERVAL) {
 			await ctx.db.insert("documentVersions", {
 				documentId: args.documentId,
 				content: document.content,
@@ -120,10 +96,9 @@ export const autoCreateVersion = mutation({
 				createdBy: user._id,
 			})
 
-			// Cleanup old versions
 			if (versions.length >= MAX_VERSIONS) {
-				const sortedVersions = versions.sort((a: any, b: any) => a.createdAt - b.createdAt)
-				await ctx.db.delete(sortedVersions[0]._id)
+				const oldest = [...versions].sort((a, b) => a.createdAt - b.createdAt)[0]
+				await ctx.db.delete("documentVersions", oldest._id)
 			}
 
 			return true
@@ -133,9 +108,6 @@ export const autoCreateVersion = mutation({
 	},
 })
 
-/**
- * List all versions for a document
- */
 export const listVersions = query({
 	args: {
 		documentId: v.id("documents"),
@@ -156,28 +128,31 @@ export const listVersions = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return []
 
-		try {
-			await checkDocumentAccess(ctx, args.documentId, user._id)
-		} catch {
-			return []
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) return []
 
-		const limit = args.limit || 20
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return []
+
+		const count = args.limit ?? 20
 
 		const versions = await ctx.db
 			.query("documentVersions")
-			.withIndex("by_document", (q: any) => q.eq("documentId", args.documentId))
+			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
 
-		// Sort by createdAt descending and limit
-		versions.sort((a: any, b: any) => b.createdAt - a.createdAt)
-		return versions.slice(0, limit)
+		const sorted = [...versions].sort((a, b) => b.createdAt - a.createdAt)
+		return sorted.slice(0, count)
 	},
 })
 
-/**
- * Get a specific version
- */
 export const getVersion = query({
 	args: {
 		versionId: v.id("documentVersions"),
@@ -198,21 +173,26 @@ export const getVersion = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return null
 
-		const version = await ctx.db.get(args.versionId)
+		const version = await ctx.db.get("documentVersions", args.versionId)
 		if (!version) return null
 
-		try {
-			await checkDocumentAccess(ctx, version.documentId, user._id)
-			return version
-		} catch {
-			return null
-		}
+		const document = await ctx.db.get("documents", version.documentId)
+		if (!document || document.isDeleted) return null
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", version.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return null
+
+		return version
 	},
 })
 
-/**
- * Restore a document to a specific version
- */
 export const restoreVersion = mutation({
 	args: {
 		versionId: v.id("documentVersions"),
@@ -221,18 +201,15 @@ export const restoreVersion = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		const version = await ctx.db.get(args.versionId)
-		if (!version) {
-			throw new Error("Version not found")
-		}
+		const version = await ctx.db.get("documentVersions", args.versionId)
+		if (!version) throw new Error("Version not found")
 
 		const { document } = await checkDocumentAccess(ctx, version.documentId, user._id)
 
-		// Check if user has edit access
 		if (document.ownerId !== user._id) {
 			const collaborator = await ctx.db
 				.query("documentCollaborators")
-				.withIndex("by_document_user", (q: any) =>
+				.withIndex("by_document_user", (q) =>
 					q.eq("documentId", version.documentId).eq("userId", user._id),
 				)
 				.unique()
@@ -242,7 +219,6 @@ export const restoreVersion = mutation({
 			}
 		}
 
-		// Create a version of current state before restoring
 		await ctx.db.insert("documentVersions", {
 			documentId: version.documentId,
 			content: document.content,
@@ -251,8 +227,7 @@ export const restoreVersion = mutation({
 			createdBy: user._id,
 		})
 
-		// Restore the document
-		await ctx.db.patch(version.documentId, {
+		await ctx.db.patch("documents", version.documentId, {
 			content: version.content,
 			title: version.title,
 			updatedAt: Date.now(),
@@ -262,9 +237,6 @@ export const restoreVersion = mutation({
 	},
 })
 
-/**
- * Compare two versions
- */
 export const compareVersions = query({
 	args: {
 		versionId1: v.id("documentVersions"),
@@ -291,41 +263,44 @@ export const compareVersions = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return null
 
-		const [version1, version2] = await Promise.all([
-			ctx.db.get(args.versionId1),
-			ctx.db.get(args.versionId2),
+		const [v1, v2] = await Promise.all([
+			ctx.db.get("documentVersions", args.versionId1),
+			ctx.db.get("documentVersions", args.versionId2),
 		])
 
-		if (!version1 || !version2) return null
-		if (version1.documentId !== version2.documentId) return null
+		if (!v1 || !v2) return null
+		if (v1.documentId !== v2.documentId) return null
 
-		try {
-			await checkDocumentAccess(ctx, version1.documentId, user._id)
-		} catch {
-			return null
-		}
+		const document = await ctx.db.get("documents", v1.documentId)
+		if (!document || document.isDeleted) return null
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", v1.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return null
 
 		return {
 			version1: {
-				_id: version1._id,
-				content: version1.content,
-				title: version1.title,
-				createdAt: version1.createdAt,
+				_id: v1._id,
+				content: v1.content,
+				title: v1.title,
+				createdAt: v1.createdAt,
 			},
 			version2: {
-				_id: version2._id,
-				content: version2.content,
-				title: version2.title,
-				createdAt: version2.createdAt,
+				_id: v2._id,
+				content: v2.content,
+				title: v2.title,
+				createdAt: v2.createdAt,
 			},
 		}
 	},
 })
 
-/**
- * Delete a specific version
- * Only the document owner can delete versions
- */
 export const deleteVersion = mutation({
 	args: {
 		versionId: v.id("documentVersions"),
@@ -334,25 +309,20 @@ export const deleteVersion = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		const version = await ctx.db.get(args.versionId)
-		if (!version) {
-			throw new Error("Version not found")
-		}
+		const version = await ctx.db.get("documentVersions", args.versionId)
+		if (!version) throw new Error("Version not found")
 
-		const document = await ctx.db.get(version.documentId)
+		const document = await ctx.db.get("documents", version.documentId)
 		if (!document || document.ownerId !== user._id) {
 			throw new Error("Only the document owner can delete versions")
 		}
 
-		await ctx.db.delete(args.versionId)
+		await ctx.db.delete("documentVersions", args.versionId)
 
 		return null
 	},
 })
 
-/**
- * Get version count for a document
- */
 export const getVersionCount = query({
 	args: {
 		documentId: v.id("documents"),
@@ -362,53 +332,54 @@ export const getVersionCount = query({
 		const user = await getAuthUserSafe(ctx)
 		if (!user) return 0
 
-		try {
-			await checkDocumentAccess(ctx, args.documentId, user._id)
-		} catch {
-			return 0
-		}
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) return 0
+
+		const isOwner = document.ownerId === user._id
+		const collaborator = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", user._id),
+			)
+			.unique()
+
+		if (!isOwner && !collaborator) return 0
 
 		const versions = await ctx.db
 			.query("documentVersions")
-			.withIndex("by_document", (q: any) => q.eq("documentId", args.documentId))
+			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
 			.collect()
 
 		return versions.length
 	},
 })
 
-/**
- * Internal mutation to cleanup old versions across all documents
- * Can be scheduled as a cron job
- */
 export const cleanupOldVersions = internalMutation({
 	args: {},
 	returns: v.number(),
 	handler: async (ctx) => {
-		const allVersions = await ctx.db.query("documentVersions").collect()
+		const all = await ctx.db.query("documentVersions").collect()
 
-		// Group by document
-		const versionsByDocument = new Map<Id<"documents">, any[]>()
-		for (const version of allVersions) {
-			const existing = versionsByDocument.get(version.documentId) || []
+		const byDocument = new Map<Id<"documents">, Doc<"documentVersions">[]>()
+		for (const version of all) {
+			const existing = byDocument.get(version.documentId) ?? []
 			existing.push(version)
-			versionsByDocument.set(version.documentId, existing)
+			byDocument.set(version.documentId, existing)
 		}
 
-		let deletedCount = 0
+		let deleted = 0
 
-		// For each document, delete excess versions
-		for (const [, versions] of versionsByDocument) {
+		for (const [, versions] of byDocument) {
 			if (versions.length > MAX_VERSIONS) {
-				versions.sort((a: any, b: any) => a.createdAt - b.createdAt)
-				const toDelete = versions.slice(0, versions.length - MAX_VERSIONS)
+				const sorted = [...versions].sort((a, b) => a.createdAt - b.createdAt)
+				const toDelete = sorted.slice(0, versions.length - MAX_VERSIONS)
 				for (const version of toDelete) {
-					await ctx.db.delete(version._id)
-					deletedCount++
+					await ctx.db.delete("documentVersions", version._id)
+					deleted++
 				}
 			}
 		}
 
-		return deletedCount
+		return deleted
 	},
 })
