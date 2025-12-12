@@ -9,8 +9,10 @@ import { DocumentHeader } from "@/components/documents/document-header"
 import { Editor } from "@/components/editor/editor"
 import { Toolbar } from "@/components/editor/toolbar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useEditorStore } from "@/store/use-editor-store"
 
 const PRESENCE_HEARTBEAT_INTERVAL = 10 * 1000 // 10 seconds
+const SAVE_DEBOUNCE_MS = 300
 
 export const Route = createFileRoute("/documents/$documentId")({
 	component: DocumentEditor,
@@ -32,6 +34,8 @@ function DocumentEditor() {
 	const addToRecent = useMutation(api.userPreferences.addToRecentDocuments)
 	const updatePresence = useMutation(api.presence.updatePresence)
 	const removePresence = useMutation(api.presence.removePresence)
+
+	const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
 
 	// Track the last saved content to avoid unnecessary saves
 	const lastSavedContent = useRef<string | null>(null)
@@ -83,16 +87,25 @@ function DocumentEditor() {
 				return
 			}
 
-			// Debounce save by 500ms
+			// Immediately show pending status
+			setSaveStatus("pending")
+
+			// Debounce save
 			saveTimeout.current = setTimeout(async () => {
-				await updateContent({
-					documentId: docId,
-					content,
-				})
-				lastSavedContent.current = content
-			}, 500)
+				setSaveStatus("saving")
+				try {
+					await updateContent({
+						documentId: docId,
+						content,
+					})
+					lastSavedContent.current = content
+					setSaveStatus("saved")
+				} catch {
+					setSaveStatus("error")
+				}
+			}, SAVE_DEBOUNCE_MS)
 		},
-		[docId, updateContent],
+		[docId, updateContent, setSaveStatus],
 	)
 
 	// Title update (immediate, no debounce)
@@ -112,8 +125,9 @@ function DocumentEditor() {
 			if (saveTimeout.current) {
 				clearTimeout(saveTimeout.current)
 			}
+			setSaveStatus("idle")
 		}
-	}, [])
+	}, [setSaveStatus])
 
 	// Handle document not found
 	if (document === null) {

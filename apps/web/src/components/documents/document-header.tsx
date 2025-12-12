@@ -37,6 +37,9 @@ import {
 	Copy,
 	History,
 	Pencil,
+	Loader2,
+	Check,
+	AlertCircle,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -45,6 +48,7 @@ import { ExportDocumentDialog } from "./export-document-dialog"
 import { RenameDocumentDialog } from "./rename-document-dialog"
 import { VersionHistoryDialog } from "./version-history-dialog"
 import { toast } from "sonner"
+import { useEditorStore } from "@/store/use-editor-store"
 
 type DocumentId = Id<"documents">
 
@@ -136,6 +140,7 @@ export function DocumentHeader({
 	}
 
 	const activeUsersList = activeUsers || []
+	const saveStatus = useEditorStore((state) => state.saveStatus)
 
 	return (
 		<>
@@ -171,16 +176,56 @@ export function DocumentHeader({
 					</button>
 				)}
 
-				{/* Last Updated Badge */}
+				{/* Save Status Indicator */}
 				<TooltipProvider delayDuration={300}>
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Badge variant="secondary" className="text-muted-foreground ml-2 gap-1">
-								<Clock className="h-3 w-3" />
-								{formatDistanceToNow(updatedAt, { addSuffix: true })}
+							<Badge
+								variant="secondary"
+								className={cn(
+									"text-muted-foreground ml-2 gap-1 transition-colors",
+									saveStatus === "error" && "text-destructive",
+								)}
+							>
+								{saveStatus === "pending" && (
+									<>
+										<Clock className="h-3 w-3" />
+										Editing...
+									</>
+								)}
+								{saveStatus === "saving" && (
+									<>
+										<Loader2 className="h-3 w-3 animate-spin" />
+										Saving...
+									</>
+								)}
+								{saveStatus === "saved" && (
+									<>
+										<Check className="h-3 w-3" />
+										Saved
+									</>
+								)}
+								{saveStatus === "error" && (
+									<>
+										<AlertCircle className="h-3 w-3" />
+										Error
+									</>
+								)}
+								{saveStatus === "idle" && (
+									<>
+										<Clock className="h-3 w-3" />
+										{formatDistanceToNow(updatedAt, { addSuffix: true })}
+									</>
+								)}
 							</Badge>
 						</TooltipTrigger>
-						<TooltipContent>Last edited {new Date(updatedAt).toLocaleString()}</TooltipContent>
+						<TooltipContent>
+							{saveStatus === "pending" && "You have unsaved changes"}
+							{saveStatus === "saving" && "Saving your changes..."}
+							{saveStatus === "saved" && "All changes saved"}
+							{saveStatus === "error" && "Failed to save changes"}
+							{saveStatus === "idle" && `Last edited ${new Date(updatedAt).toLocaleString()}`}
+						</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>
 
