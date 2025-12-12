@@ -119,7 +119,7 @@ export function VersionHistoryDialog({
 	return (
 		<>
 			<Dialog open={open} onOpenChange={onOpenChange}>
-				<DialogContent className="max-w-3xl">
+				<DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-3xl">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
 							<History className="h-5 w-5" />
@@ -130,18 +130,18 @@ export function VersionHistoryDialog({
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="flex gap-4">
+					<div className="flex min-w-0 flex-col gap-4 sm:flex-row">
 						{/* Version list */}
-						<div className="w-1/3 border-r pr-4">
-							<div className="mb-3 flex items-center justify-between">
-								<span className="text-muted-foreground text-sm">
-									{versions?.length ?? 0} versions
+						<div className="w-full shrink-0 sm:w-56 sm:border-r sm:pr-4">
+							<div className="mb-3 flex items-center justify-between gap-2">
+								<span className="text-muted-foreground shrink-0 text-sm">
+									{versions?.length ?? 0} {versions?.length === 1 ? "version" : "versions"}
 								</span>
 								<Button variant="outline" size="sm" onClick={handleCreateSnapshot}>
 									Save Snapshot
 								</Button>
 							</div>
-							<ScrollArea className="h-[400px]">
+							<ScrollArea className="h-[220px] sm:h-[400px]">
 								{versions?.length === 0 && (
 									<div className="text-muted-foreground py-8 text-center text-sm">
 										No versions yet. Versions are created automatically as you edit.
@@ -162,10 +162,12 @@ export function VersionHistoryDialog({
 												: "hover:bg-accent/50",
 										)}
 									>
-										<div className="flex items-center gap-2">
-											<span className="font-medium">{version.title || "Untitled"}</span>
+										<div className="flex items-start justify-between gap-2">
+											<span className="text-sm font-medium">
+												{format(version.createdAt, "MMM d, yyyy")}
+											</span>
 											{index === 0 && (
-												<Badge variant="secondary" className="text-xs">
+												<Badge variant="secondary" className="shrink-0 text-xs">
 													Latest
 												</Badge>
 											)}
@@ -179,25 +181,28 @@ export function VersionHistoryDialog({
 						</div>
 
 						{/* Version details */}
-						<div className="flex-1">
+						<div className="flex min-w-0 flex-1 flex-col">
 							{selectedVersion ? (
-								<div className="space-y-4">
+								<div className="flex min-w-0 flex-1 flex-col space-y-4">
 									<div>
-										<h3 className="font-semibold">{selectedVersion.title || "Untitled"}</h3>
+										<h3 className="font-semibold">
+											{format(selectedVersion.createdAt, "MMMM d, yyyy")}
+										</h3>
 										<p className="text-muted-foreground text-sm">
-											{format(selectedVersion.createdAt, "PPpp")}
+											{format(selectedVersion.createdAt, "h:mm a")}
 										</p>
 									</div>
 
 									<Separator />
 
 									<div className="space-y-2">
-										<div className="flex items-center justify-between">
+										<div className="flex flex-wrap items-center justify-between gap-2">
 											<span className="text-muted-foreground text-sm">Preview</span>
 											<Button
 												variant="ghost"
 												size="sm"
 												onClick={() => setPreviewMode(!previewMode)}
+												className="shrink-0"
 											>
 												<Eye className="mr-1 h-4 w-4" />
 												{previewMode ? "Hide" : "Show"} Full
@@ -205,7 +210,7 @@ export function VersionHistoryDialog({
 										</div>
 										<ScrollArea
 											className={cn(
-												"rounded-md border p-3",
+												"min-w-0 flex-1 rounded-md border p-3",
 												previewMode ? "h-[250px]" : "h-[100px]",
 											)}
 										>
@@ -215,8 +220,11 @@ export function VersionHistoryDialog({
 										</ScrollArea>
 									</div>
 
-									<div className="flex gap-2">
-										<Button onClick={() => setRestoreDialogOpen(true)} className="flex-1">
+									<div className="flex min-w-0 flex-wrap gap-2">
+										<Button
+											onClick={() => setRestoreDialogOpen(true)}
+											className="min-w-[12rem] flex-1 whitespace-normal"
+										>
 											<RotateCcw className="mr-2 h-4 w-4" />
 											Restore This Version
 										</Button>
@@ -224,6 +232,7 @@ export function VersionHistoryDialog({
 											variant="outline"
 											size="icon"
 											onClick={() => handleDelete(selectedVersion._id)}
+											className="shrink-0"
 										>
 											<Trash2 className="h-4 w-4" />
 										</Button>
