@@ -1,3 +1,4 @@
+import type React from "react"
 import { useState } from "react"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@writer/backend/convex/_generated/api"
@@ -43,30 +44,30 @@ export function ShareDocumentDialog({
 	documentId,
 	documentTitle,
 }: ShareDocumentDialogProps) {
-	const [userId, setUserId] = useState("")
+	const [username, setUsername] = useState("")
 	const [role, setRole] = useState<Role>("editor")
 	const [isAdding, setIsAdding] = useState(false)
 
 	const collaborators = useQuery(api.collaborators.listCollaborators, { documentId })
 	const access = useQuery(api.collaborators.checkAccess, { documentId })
-	const addCollaborator = useMutation(api.collaborators.addCollaborator)
+	const addCollaborator = useMutation(api.collaborators.addCollaboratorByUsername)
 	const removeCollaborator = useMutation(api.collaborators.removeCollaborator)
 	const updateRole = useMutation(api.collaborators.updateCollaboratorRole)
 
 	const isOwner = access?.hasAccess && access.isOwner
 
 	const handleAddCollaborator = async () => {
-		const trimmedUserId = userId.trim()
-		if (!trimmedUserId) return
+		const trimmedUsername = username.trim()
+		if (!trimmedUsername) return
 
 		setIsAdding(true)
 		try {
 			await addCollaborator({
 				documentId,
-				userId: trimmedUserId,
+				username: trimmedUsername,
 				role,
 			})
-			setUserId("")
+			setUsername("")
 			toast.success("Collaborator added")
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Failed to add collaborator")
@@ -101,7 +102,7 @@ export function ShareDocumentDialog({
 	}
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && !isAdding && userId.trim()) {
+		if (e.key === "Enter" && !isAdding && username.trim()) {
 			handleAddCollaborator()
 		}
 	}
@@ -128,13 +129,13 @@ export function ShareDocumentDialog({
 				{isOwner && (
 					<div className="space-y-4">
 						<div className="grid gap-2">
-							<Label htmlFor="userId">User ID</Label>
+							<Label htmlFor="username">Username</Label>
 							<div className="flex gap-2">
 								<Input
-									id="userId"
-									placeholder="Enter user ID"
-									value={userId}
-									onChange={(e) => setUserId(e.target.value)}
+									id="username"
+									placeholder="Enter username"
+									value={username}
+									onChange={(e) => setUsername(e.target.value)}
 									onKeyDown={handleKeyDown}
 									className="flex-1"
 								/>
@@ -151,7 +152,7 @@ export function ShareDocumentDialog({
 						</div>
 						<Button
 							onClick={handleAddCollaborator}
-							disabled={isAdding || !userId.trim()}
+							disabled={isAdding || !username.trim()}
 							className="w-full gap-2"
 						>
 							<UserPlus className="h-4 w-4" />

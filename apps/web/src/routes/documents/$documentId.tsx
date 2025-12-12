@@ -29,17 +29,24 @@ function DocumentEditor() {
 	const docId = documentId as DocumentId
 
 	const document = useQuery(api.realtime.subscribeToDocument, { documentId: docId })
+	const access = useQuery(api.collaborators.checkAccess, { documentId: docId })
 	const updateContent = useMutation(api.realtime.updateDocumentContent)
 	const updateTitle = useMutation(api.realtime.updateDocumentTitle)
 	const addToRecent = useMutation(api.userPreferences.addToRecentDocuments)
 	const updatePresence = useMutation(api.presence.updatePresence)
 	const removePresence = useMutation(api.presence.removePresence)
 
+	const canEdit = access?.hasAccess ? access.role !== "viewer" : false
+	const setCanEdit = useEditorStore((state) => state.setCanEdit)
 	const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
 
 	// Track the last saved content to avoid unnecessary saves
 	const lastSavedContent = useRef<string | null>(null)
 	const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	useEffect(() => {
+		setCanEdit(canEdit)
+	}, [canEdit, setCanEdit])
 
 	// Add to recent documents when viewing
 	useEffect(() => {
@@ -77,6 +84,8 @@ function DocumentEditor() {
 	// Debounced content save
 	const handleContentUpdate = useCallback(
 		(content: string) => {
+			if (!canEdit) return
+
 			// Clear any pending save
 			if (saveTimeout.current) {
 				clearTimeout(saveTimeout.current)
@@ -105,18 +114,20 @@ function DocumentEditor() {
 				}
 			}, SAVE_DEBOUNCE_MS)
 		},
-		[docId, updateContent, setSaveStatus],
+		[canEdit, docId, updateContent, setSaveStatus],
 	)
 
 	// Title update (immediate, no debounce)
 	const handleTitleUpdate = useCallback(
 		async (title: string) => {
+			if (!canEdit) return
+
 			await updateTitle({
 				documentId: docId,
 				title,
 			})
 		},
-		[docId, updateTitle],
+		[canEdit, docId, updateTitle],
 	)
 
 	// Cleanup timeout on unmount
@@ -160,10 +171,15 @@ function DocumentEditor() {
 				title={document.title}
 				updatedAt={document.updatedAt}
 				onTitleChange={handleTitleUpdate}
+				canEdit={canEdit}
 			/>
 			<Toolbar />
 			<div className="flex-1 overflow-hidden">
-				<Editor initialContent={document.content} onUpdate={handleContentUpdate} />
+				<Editor
+					initialContent={document.content}
+					onUpdate={handleContentUpdate}
+					editable={canEdit}
+				/>
 			</div>
 		</div>
 	)

@@ -68,7 +68,7 @@ export const Editor = ({ initialContent, onUpdate, editable = true }: EditorProp
 					"bg-card border-border border",
 					"flex flex-col min-h-full w-[816px]",
 					"pt-10 pr-14 pb-10 pl-14",
-					"cursor-text",
+					editable ? "cursor-text" : "cursor-default",
 				),
 			},
 		},
@@ -76,6 +76,11 @@ export const Editor = ({ initialContent, onUpdate, editable = true }: EditorProp
 		content: parsedInitialContent,
 		editable,
 	})
+
+	useEffect(() => {
+		if (!editor) return
+		editor.setEditable(editable)
+	}, [editor, editable])
 
 	// Handle external content updates (from other collaborators or initial load)
 	useEffect(() => {

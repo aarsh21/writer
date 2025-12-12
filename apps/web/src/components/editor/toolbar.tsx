@@ -26,6 +26,7 @@ import {
 	Undo2,
 	Upload,
 } from "lucide-react"
+import type React from "react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,7 @@ import { cn } from "@/lib/utils"
 import { useEditorStore } from "@/store/use-editor-store"
 
 const LineHeightButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const lineHeights = [
 		{ label: "Default", value: "normal" },
@@ -66,6 +67,7 @@ const LineHeightButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<ListCollapse className="size-4" />
@@ -79,7 +81,11 @@ const LineHeightButton = () => {
 					<button
 						type="button"
 						key={value}
-						onClick={() => editor?.chain().focus().setLineHeight(value).run()}
+						disabled={!canEdit}
+						onClick={() => {
+							if (!canEdit) return
+							editor?.chain().focus().setLineHeight(value).run()
+						}}
 						className={cn(
 							"hover:bg-accent flex items-center gap-x-2 rounded-sm px-2 py-1",
 							editor?.getAttributes("paragraph").lineHeight === value && "bg-accent",
@@ -94,7 +100,7 @@ const LineHeightButton = () => {
 }
 
 const FontSizeButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const currentFontSize = editor?.getAttributes("textStyle").fontSize
 		? editor?.getAttributes("textStyle").fontSize.replace("px", "")
@@ -105,6 +111,11 @@ const FontSizeButton = () => {
 	const [isEditing, setIsEditing] = useState(false)
 
 	const updateFontSize = (newSize: string) => {
+		if (!canEdit) {
+			setIsEditing(false)
+			return
+		}
+
 		const size = Number.parseInt(newSize, 10)
 		if (!Number.isNaN(size) && size > 0) {
 			editor?.chain().focus().setFontSize(`${size}px`).run()
@@ -115,6 +126,7 @@ const FontSizeButton = () => {
 	}
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		if (!canEdit) return
 		setInputValue(e.target.value)
 	}
 
@@ -148,6 +160,7 @@ const FontSizeButton = () => {
 				<TooltipTrigger asChild>
 					<button
 						type="button"
+						disabled={!canEdit}
 						onClick={decrement}
 						className="hover:bg-accent flex h-7 w-7 shrink-0 items-center justify-center rounded-sm"
 					>
@@ -163,6 +176,7 @@ const FontSizeButton = () => {
 					onChange={handleInputChange}
 					onBlur={handleInputBlur}
 					onKeyDown={handleKeyDown}
+					disabled={!canEdit}
 					className="border-input h-7 w-10 rounded-sm border bg-transparent text-center text-sm focus:outline-none focus:ring-0"
 				/>
 			) : (
@@ -170,7 +184,9 @@ const FontSizeButton = () => {
 					<TooltipTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							onClick={() => {
+								if (!canEdit) return
 								setIsEditing(true)
 								setFontSize(currentFontSize)
 							}}
@@ -186,6 +202,7 @@ const FontSizeButton = () => {
 				<TooltipTrigger asChild>
 					<button
 						type="button"
+						disabled={!canEdit}
 						onClick={increment}
 						className="hover:bg-accent flex h-7 w-7 shrink-0 items-center justify-center rounded-sm"
 					>
@@ -199,7 +216,7 @@ const FontSizeButton = () => {
 }
 
 const ListButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const lists = [
 		{
@@ -223,6 +240,7 @@ const ListButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<List className="size-4" />
@@ -236,7 +254,11 @@ const ListButton = () => {
 					<button
 						type="button"
 						key={label}
-						onClick={onClick}
+						disabled={!canEdit}
+						onClick={() => {
+							if (!canEdit) return
+							onClick()
+						}}
 						className={cn(
 							"hover:bg-accent flex items-center gap-x-2 rounded-sm px-2 py-1",
 							isActive() && "bg-accent",
@@ -252,7 +274,7 @@ const ListButton = () => {
 }
 
 const AlignButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const alignments = [
 		{
@@ -284,6 +306,7 @@ const AlignButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<AlignLeft className="size-4" />
@@ -297,7 +320,11 @@ const AlignButton = () => {
 					<button
 						type="button"
 						key={value}
-						onClick={() => editor?.chain().focus().setTextAlign(value).run()}
+						disabled={!canEdit}
+						onClick={() => {
+							if (!canEdit) return
+							editor?.chain().focus().setTextAlign(value).run()
+						}}
 						className={cn(
 							"hover:bg-accent flex items-center gap-x-2 rounded-sm px-2 py-1",
 							editor?.isActive({ textAlign: value }) && "bg-accent",
@@ -313,15 +340,17 @@ const AlignButton = () => {
 }
 
 const ImageButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 	const [isDialogOpen, setIsDialogOpen] = useState(false)
 	const [imageUrl, setImageUrl] = useState("")
 
 	const onChange = (src: string) => {
+		if (!canEdit) return
 		editor?.chain().focus().setImage({ src }).run()
 	}
 
 	const onUpload = () => {
+		if (!canEdit) return
 		const input = document.createElement("input")
 		input.type = "file"
 		input.accept = "image/*"
@@ -339,6 +368,7 @@ const ImageButton = () => {
 	}
 
 	const handleImageUrlSubmit = () => {
+		if (!canEdit) return
 		if (imageUrl) {
 			onChange(imageUrl)
 			setImageUrl("")
@@ -354,7 +384,8 @@ const ImageButton = () => {
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
-								className="hover:bg-accent flex h-7 min-w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
+								disabled={!canEdit}
+								className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 							>
 								<ImageIcon className="size-4" />
 							</button>
@@ -363,18 +394,31 @@ const ImageButton = () => {
 					<TooltipContent>Insert Image</TooltipContent>
 				</Tooltip>
 				<DropdownMenuContent className="flex flex-col gap-x-2 p-2.5">
-					<DropdownMenuItem onClick={onUpload} className="cursor-pointer">
+					<DropdownMenuItem disabled={!canEdit} onClick={onUpload} className="cursor-pointer">
 						<Upload className="mr-2 size-4" />
 						Upload
 					</DropdownMenuItem>
-					<DropdownMenuItem onClick={() => setIsDialogOpen(true)} className="cursor-pointer">
+					<DropdownMenuItem
+						disabled={!canEdit}
+						onClick={() => {
+							if (!canEdit) return
+							setIsDialogOpen(true)
+						}}
+						className="cursor-pointer"
+					>
 						<Search className="mr-2 size-4" />
 						Paste image url
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
 
-			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+			<Dialog
+				open={isDialogOpen}
+				onOpenChange={(open) => {
+					if (!canEdit) return
+					setIsDialogOpen(open)
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Insert image URL</DialogTitle>
@@ -382,6 +426,7 @@ const ImageButton = () => {
 					<Input
 						placeholder="Insert image URL"
 						value={imageUrl}
+						disabled={!canEdit}
 						onChange={(e) => setImageUrl(e.target.value)}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") {
@@ -390,7 +435,9 @@ const ImageButton = () => {
 						}}
 					/>
 					<DialogFooter>
-						<Button onClick={handleImageUrlSubmit}>Insert</Button>
+						<Button disabled={!canEdit} onClick={handleImageUrlSubmit}>
+							Insert
+						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
@@ -399,10 +446,11 @@ const ImageButton = () => {
 }
 
 const LinkButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 	const [value, setValue] = useState("")
 
 	const onChange = (href: string) => {
+		if (!canEdit) return
 		editor?.chain().focus().extendMarkRange("link").setLink({ href }).run()
 		setValue("")
 	}
@@ -410,6 +458,7 @@ const LinkButton = () => {
 	return (
 		<DropdownMenu
 			onOpenChange={(open) => {
+				if (!canEdit) return
 				if (open) {
 					setValue(editor?.getAttributes("link").href || "")
 				}
@@ -417,9 +466,10 @@ const LinkButton = () => {
 		>
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<DropdownMenuTrigger onClick={() => setValue(editor?.getAttributes("link").href)} asChild>
+					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<Link2 className="size-4" />
@@ -432,20 +482,27 @@ const LinkButton = () => {
 				<Input
 					placeholder="https://www.example.com"
 					value={value}
-					onChange={(e) => setValue(e.target.value)}
+					disabled={!canEdit}
+					onChange={(e) => {
+						if (!canEdit) return
+						setValue(e.target.value)
+					}}
 				/>
-				<Button onClick={() => onChange(value)}>Apply</Button>
+				<Button disabled={!canEdit} onClick={() => onChange(value)}>
+					Apply
+				</Button>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	)
 }
 
 const HighlightColorButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const value = editor?.getAttributes("highlight").color || "#FFFFFF"
 
 	const onChange = (color: string) => {
+		if (!canEdit) return
 		editor?.chain().focus().setHighlight({ color }).run()
 	}
 
@@ -467,6 +524,7 @@ const HighlightColorButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<Highlighter className="size-4" />
@@ -481,6 +539,7 @@ const HighlightColorButton = () => {
 						<button
 							type="button"
 							key={color}
+							disabled={!canEdit}
 							onClick={() => onChange(color)}
 							className={cn(
 								"h-6 w-6 rounded border",
@@ -496,11 +555,12 @@ const HighlightColorButton = () => {
 }
 
 const TextColorButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const value = editor?.getAttributes("textStyle").color || "#000000"
 
 	const onChange = (color: string) => {
+		if (!canEdit) return
 		editor?.chain().focus().setColor(color).run()
 	}
 
@@ -526,6 +586,7 @@ const TextColorButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
+							disabled={!canEdit}
 							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<span className="text-xs">A</span>
@@ -541,6 +602,7 @@ const TextColorButton = () => {
 						<button
 							type="button"
 							key={color}
+							disabled={!canEdit}
 							onClick={() => onChange(color)}
 							className={cn(
 								"h-6 w-6 rounded border",
@@ -556,7 +618,7 @@ const TextColorButton = () => {
 }
 
 const HeadingLevelButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const headings = [
 		{ label: "Normal text", value: 0, fontSize: "16px" },
@@ -584,7 +646,8 @@ const HeadingLevelButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
-							className="hover:bg-accent flex h-7 min-w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
+							disabled={!canEdit}
+							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<span className="truncate">{getCurrentHeading()}</span>
 							<ChevronDown className="ml-2 size-4 shrink-0" />
@@ -598,6 +661,7 @@ const HeadingLevelButton = () => {
 					<button
 						type="button"
 						key={value}
+						disabled={!canEdit}
 						style={{ fontSize }}
 						className={cn(
 							"hover:bg-accent flex items-center gap-x-2 rounded-sm px-2 py-1",
@@ -605,15 +669,16 @@ const HeadingLevelButton = () => {
 								(editor?.isActive("heading", { level: value as Level }) && "bg-accent"),
 						)}
 						onClick={() => {
+							if (!canEdit) return
 							if (value === 0) {
 								editor?.chain().focus().setParagraph().run()
-							} else {
-								editor
-									?.chain()
-									.focus()
-									.toggleHeading({ level: value as Level })
-									.run()
+								return
 							}
+							editor
+								?.chain()
+								.focus()
+								.toggleHeading({ level: value as Level })
+								.run()
 						}}
 					>
 						{label}
@@ -625,7 +690,7 @@ const HeadingLevelButton = () => {
 }
 
 const FontFamilyButton = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const fonts = [
 		{ label: "Arial", value: "Arial" },
@@ -642,7 +707,8 @@ const FontFamilyButton = () => {
 					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
-							className="hover:bg-accent flex h-7 w-[120px] shrink-0 items-center justify-between overflow-hidden rounded-sm px-1.5 text-sm"
+							disabled={!canEdit}
+							className="hover:bg-accent flex h-7 min-w-7 shrink-0 flex-col items-center justify-center overflow-hidden rounded-sm px-1.5 text-sm"
 						>
 							<span className="truncate">
 								{editor?.getAttributes("textStyle").fontFamily || "Arial"}
@@ -657,7 +723,11 @@ const FontFamilyButton = () => {
 				{fonts.map(({ label, value }) => (
 					<button
 						type="button"
-						onClick={() => editor?.chain().focus().setFontFamily(value).run()}
+						disabled={!canEdit}
+						onClick={() => {
+							if (!canEdit) return
+							editor?.chain().focus().setFontFamily(value).run()
+						}}
 						key={value}
 						className={cn(
 							"hover:bg-accent flex items-center gap-x-2 rounded-sm px-2 py-1",
@@ -676,20 +746,29 @@ const FontFamilyButton = () => {
 interface ToolbarButtonProps {
 	onClick?: () => void
 	isActive?: boolean
+	disabled?: boolean
 	icon: LucideIcon
 	label: string
 	shortcut?: string
 }
 
-const ToolbarButton = ({ onClick, isActive, icon: Icon, label, shortcut }: ToolbarButtonProps) => {
+const ToolbarButton = ({
+	onClick,
+	isActive,
+	disabled,
+	icon: Icon,
+	label,
+	shortcut,
+}: ToolbarButtonProps) => {
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<button
 					type="button"
+					disabled={disabled}
 					onClick={onClick}
 					className={cn(
-						"hover:bg-accent flex h-7 min-w-7 items-center justify-center rounded-sm text-sm",
+						"hover:bg-accent flex h-7 min-w-7 items-center justify-center rounded-sm text-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
 						isActive && "bg-accent",
 					)}
 				>
@@ -709,26 +788,35 @@ const ToolbarButton = ({ onClick, isActive, icon: Icon, label, shortcut }: Toolb
 }
 
 export const Toolbar = () => {
-	const { editor } = useEditorStore()
+	const { editor, canEdit } = useEditorStore()
 
 	const sections: {
 		label: string
 		icon: LucideIcon
 		onClick: () => void
 		isActive?: boolean
+		disabled?: boolean
 		shortcut?: string
 	}[][] = [
 		[
 			{
 				label: "Undo",
 				icon: Undo2,
-				onClick: () => editor?.chain().focus().undo().run(),
+				disabled: !canEdit,
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().undo().run()
+				},
 				shortcut: "⌘Z",
 			},
 			{
 				label: "Redo",
 				icon: Redo2,
-				onClick: () => editor?.chain().focus().redo().run(),
+				disabled: !canEdit,
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().redo().run()
+				},
 				shortcut: "⌘⇧Z",
 			},
 			{
@@ -750,22 +838,34 @@ export const Toolbar = () => {
 			{
 				label: "Bold",
 				icon: Bold,
+				disabled: !canEdit,
 				isActive: editor?.isActive("bold"),
-				onClick: () => editor?.chain().focus().toggleBold().run(),
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().toggleBold().run()
+				},
 				shortcut: "⌘B",
 			},
 			{
 				label: "Italic",
 				icon: Italic,
+				disabled: !canEdit,
 				isActive: editor?.isActive("italic"),
-				onClick: () => editor?.chain().focus().toggleItalic().run(),
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().toggleItalic().run()
+				},
 				shortcut: "⌘I",
 			},
 			{
 				label: "Underline",
 				icon: Underline,
+				disabled: !canEdit,
 				isActive: editor?.isActive("underline"),
-				onClick: () => editor?.chain().focus().toggleUnderline().run(),
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().toggleUnderline().run()
+				},
 				shortcut: "⌘U",
 			},
 		],
@@ -773,13 +873,21 @@ export const Toolbar = () => {
 			{
 				label: "Task List",
 				icon: ListTodo,
-				onClick: () => editor?.chain().focus().toggleTaskList().run(),
+				disabled: !canEdit,
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().toggleTaskList().run()
+				},
 				isActive: editor?.isActive("taskList"),
 			},
 			{
 				label: "Remove Formatting",
 				icon: RemoveFormatting,
-				onClick: () => editor?.chain().focus().unsetAllMarks().run(),
+				disabled: !canEdit,
+				onClick: () => {
+					if (!canEdit) return
+					editor?.chain().focus().unsetAllMarks().run()
+				},
 				shortcut: "⌘\\",
 			},
 		],

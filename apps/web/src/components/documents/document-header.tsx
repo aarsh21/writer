@@ -1,3 +1,4 @@
+import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import type { Id } from "@writer/backend/convex/_generated/dataModel"
 import { useMutation, useQuery } from "convex/react"
@@ -57,6 +58,7 @@ interface DocumentHeaderProps {
 	title: string
 	updatedAt: number
 	onTitleChange: (title: string) => void
+	canEdit: boolean
 }
 
 export function DocumentHeader({
@@ -64,6 +66,7 @@ export function DocumentHeader({
 	title,
 	updatedAt,
 	onTitleChange,
+	canEdit,
 }: DocumentHeaderProps) {
 	const navigate = useNavigate()
 	const [isEditing, setIsEditing] = useState(false)
@@ -100,6 +103,12 @@ export function DocumentHeader({
 	}, [isEditing])
 
 	const handleSave = () => {
+		if (!canEdit) {
+			setEditValue(title)
+			setIsEditing(false)
+			return
+		}
+
 		const trimmed = editValue.trim()
 		if (trimmed && trimmed !== title) {
 			onTitleChange(trimmed)
@@ -130,6 +139,7 @@ export function DocumentHeader({
 	}
 
 	const handleDuplicate = async () => {
+		if (!canEdit) return
 		try {
 			const newDocId = await duplicateDocument({ documentId })
 			toast.success("Document duplicated")
@@ -141,6 +151,7 @@ export function DocumentHeader({
 
 	const activeUsersList = activeUsers || []
 	const saveStatus = useEditorStore((state) => state.saveStatus)
+	const statusLabel = canEdit ? saveStatus : "idle"
 
 	return (
 		<>
@@ -161,19 +172,29 @@ export function DocumentHeader({
 						onKeyDown={handleKeyDown}
 						className="h-8 max-w-md text-lg font-semibold"
 						placeholder="Document title"
+						disabled={!canEdit}
 					/>
 				) : (
 					<button
 						type="button"
-						onClick={() => setIsEditing(true)}
+						onClick={() => {
+							if (!canEdit) return
+							setIsEditing(true)
+						}}
 						className={cn(
 							"text-foreground max-w-md truncate text-lg font-semibold",
-							"hover:bg-accent rounded px-1 transition-colors",
+							canEdit && "hover:bg-accent rounded px-1 transition-colors",
 							"text-left",
 						)}
 					>
 						{title || "Untitled"}
 					</button>
+				)}
+
+				{!canEdit && (
+					<Badge variant="secondary" className="ml-2">
+						Read-only
+					</Badge>
 				)}
 
 				{/* Save Status Indicator */}
@@ -182,49 +203,52 @@ export function DocumentHeader({
 						<TooltipTrigger asChild>
 							<Badge
 								variant="secondary"
+								aria-live="polite"
+								title={canEdit ? undefined : "Read-only"}
 								className={cn(
 									"text-muted-foreground ml-2 gap-1 transition-colors",
-									saveStatus === "error" && "text-destructive",
+									statusLabel === "error" && "text-destructive",
 								)}
 							>
-								{saveStatus === "pending" && (
+								{statusLabel === "pending" && (
 									<>
 										<Clock className="h-3 w-3" />
 										Editing...
 									</>
 								)}
-								{saveStatus === "saving" && (
+								{statusLabel === "saving" && (
 									<>
 										<Loader2 className="h-3 w-3 animate-spin" />
 										Saving...
 									</>
 								)}
-								{saveStatus === "saved" && (
+								{statusLabel === "saved" && (
 									<>
 										<Check className="h-3 w-3" />
 										Saved
 									</>
 								)}
-								{saveStatus === "error" && (
+								{statusLabel === "error" && (
 									<>
 										<AlertCircle className="h-3 w-3" />
 										Error
 									</>
 								)}
-								{saveStatus === "idle" && (
+								{statusLabel === "idle" && (
 									<>
 										<Clock className="h-3 w-3" />
-										{formatDistanceToNow(updatedAt, { addSuffix: true })}
+										{canEdit ? formatDistanceToNow(updatedAt, { addSuffix: true }) : "Viewing"}
 									</>
 								)}
 							</Badge>
 						</TooltipTrigger>
 						<TooltipContent>
-							{saveStatus === "pending" && "You have unsaved changes"}
-							{saveStatus === "saving" && "Saving your changes..."}
-							{saveStatus === "saved" && "All changes saved"}
-							{saveStatus === "error" && "Failed to save changes"}
-							{saveStatus === "idle" && `Last edited ${new Date(updatedAt).toLocaleString()}`}
+							{statusLabel === "pending" && "You have unsaved changes"}
+							{statusLabel === "saving" && "Saving your changes..."}
+							{statusLabel === "saved" && "All changes saved"}
+							{statusLabel === "error" && "Failed to save changes"}
+							{statusLabel === "idle" &&
+								(canEdit ? `Last edited ${new Date(updatedAt).toLocaleString()}` : "Read-only")}
 						</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>
@@ -298,11 +322,23 @@ export function DocumentHeader({
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" className="w-48">
-							<DropdownMenuItem onClick={() => setRenameDialogOpen(true)}>
+							<DropdownMenuItem
+								disabled={!canEdit}
+								onClick={() => {
+									if (!canEdit) return
+									setRenameDialogOpen(true)
+								}}
+							>
 								<Pencil className="mr-2 h-4 w-4" />
 								Rename
 							</DropdownMenuItem>
-							<DropdownMenuItem onClick={handleDuplicate}>
+							<DropdownMenuItem
+								disabled={!canEdit}
+								onClick={() => {
+									if (!canEdit) return
+									handleDuplicate()
+								}}
+							>
 								<Copy className="mr-2 h-4 w-4" />
 								Duplicate
 							</DropdownMenuItem>
@@ -317,7 +353,11 @@ export function DocumentHeader({
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
-								onClick={() => setDeleteDialogOpen(true)}
+								disabled={!canEdit}
+								onClick={() => {
+									if (!canEdit) return
+									setDeleteDialogOpen(true)
+								}}
 								className="text-destructive focus:text-destructive"
 							>
 								<Trash2 className="mr-2 h-4 w-4" />

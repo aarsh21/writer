@@ -18,3 +18,9 @@ Error handling: fail fast on missing prerequisites, surface user-facing errors v
 Convex backend: keep functions typed against generated schema; avoid direct env access in client bundles.
 Auth: use `ConvexBetterAuthProvider` wiring from `src/main.tsx`; reuse shared `authClient`.
 Secrets: never commit .env files; follow .gitignore patterns.
+
+## btca
+Trigger: user says "use btca" (for codebase/docs questions).
+Run:
+- btca ask -t <tech> -q "<question>"
+Available <tech>: react,tauri,tanstack-router,tailwindcss,convex,shadcn,tiptap,better-auth

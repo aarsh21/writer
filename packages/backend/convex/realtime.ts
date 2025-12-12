@@ -16,6 +16,7 @@ async function checkDocumentAccess(
 	ctx: QueryCtx | MutationCtx,
 	documentId: Id<"documents">,
 	userId: string,
+	requiredRole: "viewer" | "editor" | "owner" = "viewer",
 ) {
 	const document = await ctx.db.get("documents", documentId)
 	if (!document || document.isDeleted) throw new Error("Document not found")
@@ -27,7 +28,12 @@ async function checkDocumentAccess(
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) throw new Error("Access denied")
+	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
+
+	const roleHierarchy: Record<string, number> = { viewer: 0, editor: 1, owner: 2 }
+	if (roleHierarchy[collaborator.role] < roleHierarchy[requiredRole]) {
+		throw new Error(`Access denied: ${requiredRole} role required`)
+	}
 
 	return { document, role: collaborator.role }
 }
@@ -82,7 +88,7 @@ export const updateDocumentContent = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-		await checkDocumentAccess(ctx, args.documentId, user._id)
+		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
 		const now = Date.now()
 		await ctx.db.patch("documents", args.documentId, {
@@ -105,7 +111,7 @@ export const updateDocumentTitle = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-		await checkDocumentAccess(ctx, args.documentId, user._id)
+		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
 		const now = Date.now()
 		await ctx.db.patch("documents", args.documentId, {
@@ -129,7 +135,7 @@ export const batchUpdateDocument = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
-		await checkDocumentAccess(ctx, args.documentId, user._id)
+		await checkDocumentAccess(ctx, args.documentId, user._id, "editor")
 
 		const now = Date.now()
 		const updates: Record<string, unknown> = { updatedAt: now }

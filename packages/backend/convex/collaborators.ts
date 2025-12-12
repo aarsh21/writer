@@ -4,6 +4,7 @@ import { mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
 
 import { getAuthUserSafe } from "./auth"
+import { components } from "./_generated/api"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
@@ -40,6 +41,50 @@ export const addCollaborator = mutation({
 		return ctx.db.insert("documentCollaborators", {
 			documentId: args.documentId,
 			userId: args.userId,
+			role: args.role,
+			addedAt: Date.now(),
+		})
+	},
+})
+
+export const addCollaboratorByUsername = mutation({
+	args: {
+		documentId: v.id("documents"),
+		username: v.string(),
+		role: roleValidator,
+	},
+	returns: v.id("documentCollaborators"),
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx)
+
+		const document = await ctx.db.get("documents", args.documentId)
+		if (!document || document.isDeleted) throw new Error("Document not found")
+		if (document.ownerId !== user._id) throw new Error("Only the owner can add collaborators")
+
+		const normalizedUsername = args.username.trim().toLowerCase()
+		if (!normalizedUsername) throw new Error("Username is required")
+
+		const targetUser = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+			model: "user",
+			where: [{ field: "username", operator: "eq", value: normalizedUsername }],
+		})
+
+		if (!targetUser) throw new Error("User not found")
+		if (targetUser._id === document.ownerId)
+			throw new Error("Cannot add the owner as a collaborator")
+
+		const existing = await ctx.db
+			.query("documentCollaborators")
+			.withIndex("by_document_user", (q) =>
+				q.eq("documentId", args.documentId).eq("userId", targetUser._id),
+			)
+			.unique()
+
+		if (existing) throw new Error("User is already a collaborator")
+
+		return ctx.db.insert("documentCollaborators", {
+			documentId: args.documentId,
+			userId: targetUser._id,
 			role: args.role,
 			addedAt: Date.now(),
 		})
