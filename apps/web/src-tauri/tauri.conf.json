@@ -12,17 +12,30 @@
 	"app": {
 		"windows": [
 			{
-				"title": "writer",
-				"width": 800,
-				"height": 600,
+				"label": "main",
+				"title": "Writer",
+				"width": 1200,
+				"height": 800,
+				"minWidth": 400,
+				"minHeight": 400,
 				"resizable": true,
 				"fullscreen": false,
-				"decorations": false
+				"center": true,
+				"decorations": true,
+				"titleBarStyle": "Overlay",
+				"hiddenTitle": true,
+				"transparent": false,
+				"shadow": true,
+				"trafficLightPosition": {
+					"x": 20,
+					"y": 22
+				}
 			}
 		],
 		"security": {
 			"csp": null
-		}
+		},
+		"macOSPrivateApi": true
 	},
 	"bundle": {
 		"active": true,
@@ -33,6 +46,9 @@
 			"icons/128x128@2x.png",
 			"icons/icon.icns",
 			"icons/icon.ico"
-		]
+		],
+		"macOS": {
+			"minimumSystemVersion": "10.15"
+		}
 	}
 }

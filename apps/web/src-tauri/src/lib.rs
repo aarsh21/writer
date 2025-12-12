@@ -1,6 +1,9 @@
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -9,15 +12,40 @@ pub fn run() {
                         .build(),
                 )?;
             }
-            Ok(())
-        })
-        .on_page_load(|window, _payload| {
-            if cfg!(debug_assertions) {
-                let zoom_level = if cfg!(target_os = "linux") { 1.3 } else { 1.0 };
-                if let Err(e) = window.set_zoom(zoom_level) {
-                    eprintln!("Failed to set zoom: {}", e);
+
+            // Platform-specific window configuration
+            if let Some(window) = app.get_webview_window("main") {
+                #[cfg(target_os = "macos")]
+                {
+                    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+
+                    // Apply vibrancy effect for macOS - gives a polished native feel
+                    if let Err(e) =
+                        apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, Some(12.0))
+                    {
+                        log::warn!("Failed to apply vibrancy: {}", e);
+                    }
+                }
+
+                #[cfg(target_os = "windows")]
+                {
+                    // Keep decorations enabled on Windows for native title bar controls
+                    let _ = window.set_decorations(true);
+                }
+
+                #[cfg(target_os = "linux")]
+                {
+                    // Disable decorations on Linux for custom title bar
+                    let _ = window.set_decorations(false);
+
+                    // Adjust zoom for better readability on Linux in debug mode
+                    if cfg!(debug_assertions) {
+                        let _ = window.set_zoom(1.3);
+                    }
                 }
             }
+
+            Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
