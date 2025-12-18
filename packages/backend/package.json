@@ -18,15 +18,15 @@
 	"license": "ISC",
 	"description": "",
 	"devDependencies": {
-		"@types/node": "^24.10.3",
+		"@types/node": "^24.10.4",
 		"typescript": "^5.9.3",
-		"eslint": "^9.39.1",
-		"@eslint/js": "^9.39.1",
-		"typescript-eslint": "^8.49.0",
+		"eslint": "^9.39.2",
+		"@eslint/js": "^9.39.2",
+		"typescript-eslint": "^8.50.0",
 		"globals": "^16.5.0"
 	},
 	"dependencies": {
-		"convex": "^1.31.0",
+		"convex": "^1.31.2",
 		"better-auth": "catalog:",
 		"@convex-dev/better-auth": "^0.9.11"
 	}
