@@ -7,6 +7,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -41,6 +42,8 @@ import {
 	Loader2,
 	Check,
 	AlertCircle,
+	Wifi,
+	WifiOff,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -59,6 +62,11 @@ interface DocumentHeaderProps {
 	updatedAt: number
 	onTitleChange: (title: string) => void
 	canEdit: boolean
+	syncStatus?: {
+		isLoading: boolean
+		error: Error | null
+		onRetry: () => void
+	}
 }
 
 export function DocumentHeader({
@@ -67,6 +75,7 @@ export function DocumentHeader({
 	updatedAt,
 	onTitleChange,
 	canEdit,
+	syncStatus,
 }: DocumentHeaderProps) {
 	const navigate = useNavigate()
 	const [isEditing, setIsEditing] = useState(false)
@@ -152,6 +161,9 @@ export function DocumentHeader({
 	const activeUsersList = activeUsers || []
 	const saveStatus = useEditorStore((state) => state.saveStatus)
 	const statusLabel = canEdit ? saveStatus : "idle"
+	const showSyncError = Boolean(syncStatus?.error)
+	const isConnecting = syncStatus?.isLoading
+	const isSynced = Boolean(!syncStatus?.isLoading && syncStatus?.error === null)
 
 	return (
 		<>
@@ -252,6 +264,35 @@ export function DocumentHeader({
 						</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>
+
+				<Badge
+					variant="outline"
+					className={cn(
+						"ml-2 gap-1",
+						isConnecting && "text-muted-foreground",
+						showSyncError && "border-destructive/40 text-destructive",
+						isSynced && "border-emerald-500/40 text-emerald-600",
+					)}
+				>
+					{isConnecting && (
+						<>
+							<Loader2 className="h-3 w-3 animate-spin" />
+							Connecting...
+						</>
+					)}
+					{showSyncError && (
+						<>
+							<WifiOff className="h-3 w-3" />
+							Sync Error
+						</>
+					)}
+					{!isConnecting && !showSyncError && (
+						<>
+							<Wifi className="h-3 w-3" />
+							Synced
+						</>
+					)}
+				</Badge>
 
 				{/* Spacer */}
 				<div className="flex-1" />
@@ -367,6 +408,22 @@ export function DocumentHeader({
 					</DropdownMenu>
 				</div>
 			</header>
+
+			{showSyncError && (
+				<div className="border-border bg-background border-b px-4 py-2">
+					<Alert variant="destructive" className="flex items-center justify-between gap-4">
+						<div>
+							<AlertTitle>Sync Error</AlertTitle>
+							<AlertDescription>
+								We couldn't reach the sync service. Changes may not be shared yet.
+							</AlertDescription>
+						</div>
+						<Button variant="outline" size="sm" onClick={syncStatus?.onRetry}>
+							Retry
+						</Button>
+					</Alert>
+				</div>
+			)}
 
 			{/* Share Dialog */}
 			<ShareDocumentDialog
