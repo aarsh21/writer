@@ -27,14 +27,14 @@
     "dev:setup": "turbo -F @writer/backend dev:setup"
   },
   "dependencies": {
-    "btca": "^0.5.0",
-    "zustand": "^5.0.9"
+    "btca": "^0.5.9",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "eslint-config-prettier": "^10.1.8",
-    "prettier": "^3.7.4",
+    "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "turbo": "^2.6.3"
+    "turbo": "^2.7.5"
   },
   "packageManager": "bun@1.3.4"
 }
