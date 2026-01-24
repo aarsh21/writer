@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useMutation, useQuery } from "convex/react"
 import type { GenericId } from "convex/values"
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap"
 
 import { api } from "@writer/backend/convex/_generated/api"
 
@@ -12,8 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useEditorStore } from "@/store/use-editor-store"
 
 const PRESENCE_HEARTBEAT_INTERVAL = 10 * 1000 // 10 seconds
-const SAVE_DEBOUNCE_MS = 300
-
 export const Route = createFileRoute("/documents/$documentId")({
 	component: DocumentEditor,
 })
@@ -30,7 +29,6 @@ function DocumentEditor() {
 
 	const document = useQuery(api.realtime.subscribeToDocument, { documentId: docId })
 	const access = useQuery(api.collaborators.checkAccess, { documentId: docId })
-	const updateContent = useMutation(api.realtime.updateDocumentContent)
 	const updateTitle = useMutation(api.realtime.updateDocumentTitle)
 	const addToRecent = useMutation(api.userPreferences.addToRecentDocuments)
 	const updatePresence = useMutation(api.presence.updatePresence)
@@ -39,10 +37,16 @@ function DocumentEditor() {
 	const canEdit = access?.hasAccess ? access.role !== "viewer" : false
 	const setCanEdit = useEditorStore((state) => state.setCanEdit)
 	const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
+	const [syncError, setSyncError] = useState<Error | null>(null)
 
-	// Track the last saved content to avoid unnecessary saves
-	const lastSavedContent = useRef<string | null>(null)
-	const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const sync = useTiptapSync(api.prosemirror, documentId as string, {
+		snapshotDebounceMs: 1000,
+		onSyncError: (error) => {
+			console.error("Sync error:", error)
+			setSyncError(error)
+			setSaveStatus("error")
+		},
+	})
 
 	useEffect(() => {
 		setCanEdit(canEdit)
@@ -74,48 +78,26 @@ function DocumentEditor() {
 		}
 	}, [docId, document, updatePresence, removePresence])
 
-	// Initialize lastSavedContent when document loads
-	useEffect(() => {
-		if (document && lastSavedContent.current === null) {
-			lastSavedContent.current = document.content
+	const initializeSync = useCallback(() => {
+		if (!document || !sync || sync.isLoading || sync.initialContent !== null) {
+			return
 		}
-	}, [document])
 
-	// Debounced content save
-	const handleContentUpdate = useCallback(
-		(content: string) => {
-			if (!canEdit) return
-
-			// Clear any pending save
-			if (saveTimeout.current) {
-				clearTimeout(saveTimeout.current)
-			}
-
-			// Don't save if content hasn't changed
-			if (content === lastSavedContent.current) {
-				return
-			}
-
-			// Immediately show pending status
-			setSaveStatus("pending")
-
-			// Debounce save
-			saveTimeout.current = setTimeout(async () => {
-				setSaveStatus("saving")
-				try {
-					await updateContent({
-						documentId: docId,
-						content,
-					})
-					lastSavedContent.current = content
-					setSaveStatus("saved")
-				} catch {
-					setSaveStatus("error")
+		try {
+			const content = JSON.parse(document.content || '{"type":"doc","content":[]}')
+			sync.create(content).catch((err) => {
+				if (!err.message?.includes("already exists")) {
+					console.error("Failed to create document:", err)
 				}
-			}, SAVE_DEBOUNCE_MS)
-		},
-		[canEdit, docId, updateContent, setSaveStatus],
-	)
+			})
+		} catch (error) {
+			console.error("Invalid document content:", error)
+		}
+	}, [document, sync])
+
+	useEffect(() => {
+		initializeSync()
+	}, [initializeSync])
 
 	// Title update (immediate, no debounce)
 	const handleTitleUpdate = useCallback(
@@ -130,12 +112,23 @@ function DocumentEditor() {
 		[canEdit, docId, updateTitle],
 	)
 
+	useEffect(() => {
+		if (sync?.isLoading) {
+			setSaveStatus("pending")
+		} else if (sync?.initialContent !== null) {
+			setSaveStatus("saved")
+			setSyncError(null)
+		}
+	}, [setSaveStatus, sync?.initialContent, sync?.isLoading])
+
+	const handleRetrySync = useCallback(() => {
+		setSyncError(null)
+		window.location.reload()
+	}, [])
+
 	// Cleanup timeout on unmount
 	useEffect(() => {
 		return () => {
-			if (saveTimeout.current) {
-				clearTimeout(saveTimeout.current)
-			}
 			setSaveStatus("idle")
 		}
 	}, [setSaveStatus])
@@ -172,14 +165,23 @@ function DocumentEditor() {
 				updatedAt={document.updatedAt}
 				onTitleChange={handleTitleUpdate}
 				canEdit={canEdit}
+				syncStatus={{
+					isLoading: sync.isLoading,
+					error: syncError,
+					onRetry: handleRetrySync,
+				}}
 			/>
 			<Toolbar />
 			<div className="flex-1 overflow-hidden">
-				<Editor
-					initialContent={document.content}
-					onUpdate={handleContentUpdate}
-					editable={canEdit}
-				/>
+				{sync.isLoading || sync.initialContent === null ? (
+					<SyncLoadingState isInitializing={!sync.isLoading} />
+				) : (
+					<Editor
+						initialContent={sync.initialContent}
+						syncExtension={sync.extension}
+						editable={canEdit}
+					/>
+				)}
 			</div>
 		</div>
 	)
@@ -210,6 +212,25 @@ function DocumentSkeleton() {
 				<Skeleton className="mb-6 h-4 w-5/6" />
 				<Skeleton className="mb-2 h-4 w-full" />
 				<Skeleton className="h-4 w-1/2" />
+			</div>
+		</div>
+	)
+}
+
+function SyncLoadingState({ isInitializing }: { isInitializing: boolean }) {
+	return (
+		<div className="bg-muted/30 flex h-full flex-col items-center justify-center gap-6 px-6">
+			<div className="flex flex-col items-center gap-2">
+				<Skeleton className="h-5 w-36" />
+				<p className="text-muted-foreground text-sm">
+					{isInitializing ? "Preparing real-time sync..." : "Connecting to sync..."}
+				</p>
+			</div>
+			<div className="w-full max-w-3xl space-y-3">
+				<Skeleton className="h-4 w-5/6" />
+				<Skeleton className="h-4 w-full" />
+				<Skeleton className="h-4 w-4/5" />
+				<Skeleton className="h-4 w-2/3" />
 			</div>
 		</div>
 	)
