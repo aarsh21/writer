@@ -17,6 +17,7 @@ import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
 import type * as presence from "../presence.js";
 import type * as privateData from "../privateData.js";
+import type * as prosemirror from "../prosemirror.js";
 import type * as realtime from "../realtime.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as versions from "../versions.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   presence: typeof presence;
   privateData: typeof privateData;
+  prosemirror: typeof prosemirror;
   realtime: typeof realtime;
   userPreferences: typeof userPreferences;
   versions: typeof versions;
@@ -2054,6 +2056,82 @@ export declare const components: {
       findOne: FunctionReference<"query", "internal", any, any>;
       update: FunctionReference<"mutation", "internal", any, any>;
       updateMany: FunctionReference<"mutation", "internal", any, any>;
+    };
+  };
+  prosemirrorSync: {
+    lib: {
+      deleteDocument: FunctionReference<
+        "mutation",
+        "internal",
+        { id: string },
+        null
+      >;
+      deleteSnapshots: FunctionReference<
+        "mutation",
+        "internal",
+        { afterVersion?: number; beforeVersion?: number; id: string },
+        null
+      >;
+      deleteSteps: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          afterVersion?: number;
+          beforeTs: number;
+          deleteNewerThanLatestSnapshot?: boolean;
+          id: string;
+        },
+        null
+      >;
+      getSnapshot: FunctionReference<
+        "query",
+        "internal",
+        { id: string; version?: number },
+        { content: null } | { content: string; version: number }
+      >;
+      getSteps: FunctionReference<
+        "query",
+        "internal",
+        { id: string; version: number },
+        {
+          clientIds: Array<string | number>;
+          steps: Array<string>;
+          version: number;
+        }
+      >;
+      latestVersion: FunctionReference<
+        "query",
+        "internal",
+        { id: string },
+        null | number
+      >;
+      submitSnapshot: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          content: string;
+          id: string;
+          pruneSnapshots?: boolean;
+          version: number;
+        },
+        null
+      >;
+      submitSteps: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          clientId: string | number;
+          id: string;
+          steps: Array<string>;
+          version: number;
+        },
+        | {
+            clientIds: Array<string | number>;
+            status: "needs-rebase";
+            steps: Array<string>;
+          }
+        | { status: "synced" }
+      >;
     };
   };
 };
