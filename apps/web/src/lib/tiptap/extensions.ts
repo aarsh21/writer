@@ -21,6 +21,7 @@ import { common, createLowlight } from "lowlight"
 
 import { FontSizeExtension } from "./font-size"
 import { LineHeightExtension } from "./line-height"
+import { PageBreak } from "./page-break"
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common)
@@ -91,6 +92,7 @@ export const extensions = [
 		types: ["heading", "paragraph"],
 		defaultLineHeight: "1.5",
 	}),
+	PageBreak,
 ]
 
 export { lowlight }

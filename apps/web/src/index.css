@@ -380,3 +380,39 @@ body {
 	background-color: #fef08a;
 	padding: 0.125rem 0;
 }
+
+/* Page Break Styles */
+.tiptap .page-break {
+	margin: 2rem 0;
+	padding: 1rem 0;
+	border: 0;
+	border-top: 2px dashed var(--border);
+	page-break-after: always;
+	break-after: page;
+	position: relative;
+}
+
+.tiptap .page-break::after {
+	content: "Page Break";
+	position: absolute;
+	top: -0.625rem;
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--muted);
+	padding: 0 0.5rem;
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+	pointer-events: none;
+}
+
+@media print {
+	.tiptap .page-break {
+		border: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.tiptap .page-break::after {
+		display: none;
+	}
+}

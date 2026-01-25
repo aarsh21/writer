@@ -64,6 +64,32 @@ export const Editor = ({
 					editable ? "cursor-text" : "cursor-default",
 				),
 			},
+			handlePaste: (view, event, slice) => {
+				const clipboardEvent = event as ClipboardEvent
+				const items = Array.from(clipboardEvent.clipboardData?.items || [])
+				const imageItems = items.filter((item) => item.type.startsWith("image/"))
+
+				if (imageItems.length === 0) return false
+
+				event.preventDefault()
+				imageItems.forEach((item) => {
+					const file = item.getAsFile()
+					if (!file) return
+
+					// Warn if file size exceeds 5MB
+					if (file.size > 5 * 1024 * 1024) {
+						console.warn(`Image size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds 5MB`)
+					}
+
+					const reader = new FileReader()
+					reader.onload = (e) => {
+						const dataUrl = e.target?.result as string
+						editor?.chain().focus().setImage({ src: dataUrl }).run()
+					}
+					reader.readAsDataURL(file)
+				})
+				return true
+			},
 		},
 		extensions: syncExtension ? [...extensions, syncExtension] : extensions,
 		content: initialContent ?? { type: "doc", content: [] },

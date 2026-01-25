@@ -94,8 +94,8 @@ function SettingsContent() {
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div className="grid gap-2">
-								<Label>Name</Label>
-								<div className="text-foreground">{user?.name || "Not set"}</div>
+								<Label>Username</Label>
+								<div className="text-foreground">{user?.username || "Not set"}</div>
 							</div>
 							<div className="grid gap-2">
 								<Label>Email</Label>

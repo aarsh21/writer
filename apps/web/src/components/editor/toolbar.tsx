@@ -6,6 +6,7 @@ import {
 	AlignRight,
 	Bold,
 	ChevronDown,
+	FileText,
 	Highlighter,
 	ImageIcon,
 	Italic,
@@ -891,6 +892,18 @@ export const Toolbar = () => {
 				shortcut: "⌘\\",
 			},
 		],
+		[
+			{
+				label: "Insert Page Break",
+				icon: FileText,
+				disabled: !canEdit,
+				onClick: () => {
+					if (!canEdit) return
+					editor?.commands.setPageBreak()
+				},
+				shortcut: "⌘↵",
+			},
+		],
 	]
 
 	return (
@@ -917,6 +930,10 @@ export const Toolbar = () => {
 			<LineHeightButton />
 			<ListButton />
 			{sections[2].map((item) => (
+				<ToolbarButton key={item.label} {...item} />
+			))}
+			<Separator orientation="vertical" className="mx-1 h-6" />
+			{sections[3].map((item) => (
 				<ToolbarButton key={item.label} {...item} />
 			))}
 		</div>
