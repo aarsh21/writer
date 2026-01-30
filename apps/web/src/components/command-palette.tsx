@@ -13,7 +13,7 @@ import {
 	CommandSeparator,
 	CommandShortcut,
 } from "@/components/ui/command"
-import { FileText, Plus, Settings, Moon, Sun, Home, Clock, Keyboard, Search } from "lucide-react"
+import { Plus, Settings, Moon, Sun, Home, Clock, Keyboard, Search } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 
 // Debounce hook for search

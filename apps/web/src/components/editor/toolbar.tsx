@@ -51,7 +51,8 @@ import { cn } from "@/lib/utils"
 import { useEditorStore } from "@/store/use-editor-store"
 
 const LineHeightButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const lineHeights = [
 		{ label: "Default", value: "normal" },
@@ -101,7 +102,8 @@ const LineHeightButton = () => {
 }
 
 const FontSizeButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const currentFontSize = editor?.getAttributes("textStyle").fontSize
 		? editor?.getAttributes("textStyle").fontSize.replace("px", "")
@@ -217,7 +219,8 @@ const FontSizeButton = () => {
 }
 
 const ListButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const lists = [
 		{
@@ -275,7 +278,8 @@ const ListButton = () => {
 }
 
 const AlignButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const alignments = [
 		{
@@ -341,7 +345,8 @@ const AlignButton = () => {
 }
 
 const ImageButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 	const [isDialogOpen, setIsDialogOpen] = useState(false)
 	const [imageUrl, setImageUrl] = useState("")
 
@@ -447,7 +452,8 @@ const ImageButton = () => {
 }
 
 const LinkButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 	const [value, setValue] = useState("")
 
 	const onChange = (href: string) => {
@@ -498,7 +504,8 @@ const LinkButton = () => {
 }
 
 const HighlightColorButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const value = editor?.getAttributes("highlight").color || "#FFFFFF"
 
@@ -556,7 +563,8 @@ const HighlightColorButton = () => {
 }
 
 const TextColorButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const value = editor?.getAttributes("textStyle").color || "#000000"
 
@@ -619,7 +627,8 @@ const TextColorButton = () => {
 }
 
 const HeadingLevelButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const headings = [
 		{ label: "Normal text", value: 0, fontSize: "16px" },
@@ -691,7 +700,8 @@ const HeadingLevelButton = () => {
 }
 
 const FontFamilyButton = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const fonts = [
 		{ label: "Arial", value: "Arial" },
@@ -789,7 +799,8 @@ const ToolbarButton = ({
 }
 
 export const Toolbar = () => {
-	const { editor, canEdit } = useEditorStore()
+	const editor = useEditorStore((state) => state.editor)
+	const canEdit = useEditorStore((state) => state.canEdit)
 
 	const sections: {
 		label: string

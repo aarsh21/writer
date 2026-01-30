@@ -64,7 +64,7 @@ export const Editor = ({
 					editable ? "cursor-text" : "cursor-default",
 				),
 			},
-			handlePaste: (view, event, slice) => {
+			handlePaste: (view, event, _slice) => {
 				const clipboardEvent = event as ClipboardEvent
 				const items = Array.from(clipboardEvent.clipboardData?.items || [])
 				const imageItems = items.filter((item) => item.type.startsWith("image/"))
