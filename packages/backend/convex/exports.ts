@@ -1,6 +1,6 @@
 "use node"
 
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import { api } from "./_generated/api"
 import { action } from "./_generated/server"
@@ -302,7 +302,12 @@ export const exportToMarkdown = action({
 			documentId: args.documentId,
 		})
 
-		if (!document) throw new Error("Document not found or access denied")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found or access denied",
+			})
+		}
 
 		return {
 			title: document.title,
@@ -327,7 +332,12 @@ export const exportToHTML = action({
 			documentId: args.documentId,
 		})
 
-		if (!document) throw new Error("Document not found or access denied")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found or access denied",
+			})
+		}
 
 		return {
 			title: document.title,
@@ -351,7 +361,12 @@ export const exportToText = action({
 			documentId: args.documentId,
 		})
 
-		if (!document) throw new Error("Document not found or access denied")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found or access denied",
+			})
+		}
 
 		return {
 			title: document.title,
@@ -375,7 +390,12 @@ export const exportToJSON = action({
 			documentId: args.documentId,
 		})
 
-		if (!document) throw new Error("Document not found or access denied")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found or access denied",
+			})
+		}
 
 		return {
 			title: document.title,

@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import { mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
@@ -8,7 +8,12 @@ import { components } from "./_generated/api"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 	return user
 }
 
@@ -25,9 +30,24 @@ export const addCollaborator = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document || document.isDeleted) throw new Error("Document not found")
-		if (document.ownerId !== user._id) throw new Error("Only the owner can add collaborators")
-		if (args.userId === document.ownerId) throw new Error("Cannot add the owner as a collaborator")
+		if (!document || document.isDeleted) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can add collaborators",
+			})
+		}
+		if (args.userId === document.ownerId) {
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "Cannot add the owner as a collaborator",
+			})
+		}
 
 		const existing = await ctx.db
 			.query("documentCollaborators")
@@ -36,7 +56,12 @@ export const addCollaborator = mutation({
 			)
 			.unique()
 
-		if (existing) throw new Error("User is already a collaborator")
+		if (existing) {
+			throw new ConvexError({
+				code: "CONFLICT",
+				message: "User is already a collaborator",
+			})
+		}
 
 		return ctx.db.insert("documentCollaborators", {
 			documentId: args.documentId,
@@ -58,20 +83,44 @@ export const addCollaboratorByUsername = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document || document.isDeleted) throw new Error("Document not found")
-		if (document.ownerId !== user._id) throw new Error("Only the owner can add collaborators")
+		if (!document || document.isDeleted) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can add collaborators",
+			})
+		}
 
 		const normalizedUsername = args.username.trim().toLowerCase()
-		if (!normalizedUsername) throw new Error("Username is required")
+		if (!normalizedUsername) {
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "Username is required",
+			})
+		}
 
 		const targetUser = await ctx.runQuery(components.betterAuth.adapter.findOne, {
 			model: "user",
 			where: [{ field: "username", operator: "eq", value: normalizedUsername }],
 		})
 
-		if (!targetUser) throw new Error("User not found")
-		if (targetUser._id === document.ownerId)
-			throw new Error("Cannot add the owner as a collaborator")
+		if (!targetUser) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "User not found",
+			})
+		}
+		if (targetUser._id === document.ownerId) {
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "Cannot add the owner as a collaborator",
+			})
+		}
 
 		const existing = await ctx.db
 			.query("documentCollaborators")
@@ -80,7 +129,12 @@ export const addCollaboratorByUsername = mutation({
 			)
 			.unique()
 
-		if (existing) throw new Error("User is already a collaborator")
+		if (existing) {
+			throw new ConvexError({
+				code: "CONFLICT",
+				message: "User is already a collaborator",
+			})
+		}
 
 		return ctx.db.insert("documentCollaborators", {
 			documentId: args.documentId,
@@ -101,8 +155,18 @@ export const removeCollaborator = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document) throw new Error("Document not found")
-		if (document.ownerId !== user._id) throw new Error("Only the owner can remove collaborators")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can remove collaborators",
+			})
+		}
 
 		const collaborator = await ctx.db
 			.query("documentCollaborators")
@@ -111,7 +175,12 @@ export const removeCollaborator = mutation({
 			)
 			.unique()
 
-		if (!collaborator) throw new Error("Collaborator not found")
+		if (!collaborator) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Collaborator not found",
+			})
+		}
 
 		await ctx.db.delete("documentCollaborators", collaborator._id)
 
@@ -139,9 +208,18 @@ export const updateCollaboratorRole = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document) throw new Error("Document not found")
-		if (document.ownerId !== user._id)
-			throw new Error("Only the owner can update collaborator roles")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can update collaborator roles",
+			})
+		}
 
 		const collaborator = await ctx.db
 			.query("documentCollaborators")
@@ -150,7 +228,12 @@ export const updateCollaboratorRole = mutation({
 			)
 			.unique()
 
-		if (!collaborator) throw new Error("Collaborator not found")
+		if (!collaborator) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Collaborator not found",
+			})
+		}
 
 		await ctx.db.patch("documentCollaborators", collaborator._id, { role: args.newRole })
 
@@ -255,7 +338,12 @@ export const leaveDocument = mutation({
 			)
 			.unique()
 
-		if (!collaborator) throw new Error("You are not a collaborator on this document")
+		if (!collaborator) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "You are not a collaborator on this document",
+			})
+		}
 
 		await ctx.db.delete("documentCollaborators", collaborator._id)
 
@@ -322,9 +410,24 @@ export const transferOwnership = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document) throw new Error("Document not found")
-		if (document.ownerId !== user._id) throw new Error("Only the owner can transfer ownership")
-		if (args.newOwnerId === user._id) throw new Error("You are already the owner")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can transfer ownership",
+			})
+		}
+		if (args.newOwnerId === user._id) {
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "You are already the owner",
+			})
+		}
 
 		const existing = await ctx.db
 			.query("documentCollaborators")

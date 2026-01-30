@@ -47,6 +47,7 @@ export { createAuth }
 
 export const getCurrentUser = query({
 	args: {},
-	returns: v.any(),
-	handler: async (ctx) => getAuthUserSafe(ctx),
+	handler: async (ctx) => {
+		return getAuthUserSafe(ctx)
+	},
 })

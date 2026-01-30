@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
@@ -8,7 +8,12 @@ import { getAuthUserSafe } from "./auth"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 	return user
 }
 
@@ -313,7 +318,10 @@ export const setEditorFontSize = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		if (args.fontSize < 12 || args.fontSize > 24) {
-			throw new Error("Font size must be between 12 and 24")
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "Font size must be between 12 and 24",
+			})
 		}
 
 		const existing = await ctx.db

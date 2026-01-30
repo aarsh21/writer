@@ -1,16 +1,10 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
-import type { MutationCtx } from "./_generated/server"
 
 import { getAuthUserSafe } from "./auth"
-
-async function getAuthenticatedUser(ctx: MutationCtx) {
-	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
-	return user
-}
+import { getAuthenticatedUser, checkFolderAccess } from "./lib/utils"
 
 export const createFolder = mutation({
 	args: {
@@ -24,7 +18,10 @@ export const createFolder = mutation({
 		if (args.parentId) {
 			const parent = await ctx.db.get("folders", args.parentId)
 			if (!parent || parent.ownerId !== user._id) {
-				throw new Error("Parent folder not found or access denied")
+				throw new ConvexError({
+					code: "NOT_FOUND",
+					message: "Parent folder not found or access denied",
+				})
 			}
 		}
 
@@ -47,8 +44,18 @@ export const renameFolder = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const folder = await ctx.db.get("folders", args.folderId)
-		if (!folder) throw new Error("Folder not found")
-		if (folder.ownerId !== user._id) throw new Error("Access denied: You don't own this folder")
+		if (!folder) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Folder not found",
+			})
+		}
+		if (folder.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Access denied: You don't own this folder",
+			})
+		}
 
 		await ctx.db.patch("folders", args.folderId, { name: args.name })
 		return null
@@ -65,8 +72,18 @@ export const deleteFolder = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const folder = await ctx.db.get("folders", args.folderId)
-		if (!folder) throw new Error("Folder not found")
-		if (folder.ownerId !== user._id) throw new Error("Access denied: You don't own this folder")
+		if (!folder) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Folder not found",
+			})
+		}
+		if (folder.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Access denied: You don't own this folder",
+			})
+		}
 
 		// Helper function to recursively delete folder contents
 		async function deleteFolderRecursively(folderId: Id<"folders">) {
@@ -141,15 +158,33 @@ export const moveFolder = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const folder = await ctx.db.get("folders", args.folderId)
-		if (!folder) throw new Error("Folder not found")
-		if (folder.ownerId !== user._id) throw new Error("Access denied: You don't own this folder")
-		if (args.newParentId === args.folderId) throw new Error("Cannot move a folder into itself")
+		if (!folder) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Folder not found",
+			})
+		}
+		if (folder.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Access denied: You don't own this folder",
+			})
+		}
+		if (args.newParentId === args.folderId) {
+			throw new ConvexError({
+				code: "VALIDATION_ERROR",
+				message: "Cannot move a folder into itself",
+			})
+		}
 
 		if (args.newParentId) {
 			let currentParent: Id<"folders"> | undefined = args.newParentId
 			while (currentParent) {
 				if (currentParent === args.folderId) {
-					throw new Error("Cannot move a folder into one of its subfolders")
+					throw new ConvexError({
+						code: "VALIDATION_ERROR",
+						message: "Cannot move a folder into one of its subfolders",
+					})
 				}
 				const parent: Doc<"folders"> | null = await ctx.db.get("folders", currentParent)
 				currentParent = parent?.parentId

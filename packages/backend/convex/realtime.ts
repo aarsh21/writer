@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import type { Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
@@ -8,7 +8,12 @@ import { getAuthUserSafe } from "./auth"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 	return user
 }
 
@@ -19,7 +24,12 @@ async function checkDocumentAccess(
 	requiredRole: "viewer" | "editor" | "owner" = "viewer",
 ) {
 	const document = await ctx.db.get("documents", documentId)
-	if (!document || document.isDeleted) throw new Error("Document not found")
+	if (!document || document.isDeleted) {
+		throw new ConvexError({
+			code: "NOT_FOUND",
+			message: "Document not found",
+		})
+	}
 
 	if (document.ownerId === userId) return { document, role: "owner" as const }
 
@@ -28,11 +38,19 @@ async function checkDocumentAccess(
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
+	if (!collaborator) {
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: "Access denied: You don't have access to this document",
+		})
+	}
 
 	const roleHierarchy: Record<string, number> = { viewer: 0, editor: 1, owner: 2 }
 	if (roleHierarchy[collaborator.role] < roleHierarchy[requiredRole]) {
-		throw new Error(`Access denied: ${requiredRole} role required`)
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: `Access denied: ${requiredRole} role required`,
+		})
 	}
 
 	return { document, role: collaborator.role }

@@ -1,42 +1,10 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import type { Id } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
-import type { MutationCtx, QueryCtx } from "./_generated/server"
 
 import { getAuthUserSafe } from "./auth"
-
-async function getAuthenticatedUser(ctx: MutationCtx) {
-	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
-	return user
-}
-
-async function checkDocumentAccess(
-	ctx: QueryCtx | MutationCtx,
-	documentId: Id<"documents">,
-	userId: string,
-	requiredRole: "viewer" | "editor" | "owner" = "viewer",
-) {
-	const document = await ctx.db.get("documents", documentId)
-	if (!document || document.isDeleted) throw new Error("Document not found")
-
-	if (document.ownerId === userId) return { document, role: "owner" as const }
-
-	const collaborator = await ctx.db
-		.query("documentCollaborators")
-		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
-		.unique()
-
-	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
-
-	const roleHierarchy: Record<string, number> = { viewer: 0, editor: 1, owner: 2 }
-	if (roleHierarchy[collaborator.role] < roleHierarchy[requiredRole]) {
-		throw new Error(`Access denied: ${requiredRole} role required`)
-	}
-
-	return { document, role: collaborator.role }
-}
+import { checkDocumentAccess, getAuthenticatedUser } from "./lib/utils"
 
 export const createDocument = mutation({
 	args: {
@@ -299,8 +267,18 @@ export const restoreDocument = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const document = await ctx.db.get("documents", args.documentId)
-		if (!document) throw new Error("Document not found")
-		if (document.ownerId !== user._id) throw new Error("Only the owner can restore a document")
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can restore a document",
+			})
+		}
 
 		await ctx.db.patch("documents", args.documentId, {
 			isDeleted: false,
@@ -318,36 +296,44 @@ export const permanentlyDeleteDocument = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx)
 
-		const document = await ctx.db.get("documents", args.documentId)
-		if (!document) throw new Error("Document not found")
-		if (document.ownerId !== user._id)
-			throw new Error("Only the owner can permanently delete a document")
-
-		const collaborators = await ctx.db
-			.query("documentCollaborators")
-			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-			.collect()
-		for (const collab of collaborators) {
-			await ctx.db.delete("documentCollaborators", collab._id)
+		const document = await ctx.db.get(args.documentId)
+		if (!document) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Document not found",
+			})
+		}
+		if (document.ownerId !== user._id) {
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the owner can permanently delete a document",
+			})
 		}
 
-		const versions = await ctx.db
-			.query("documentVersions")
-			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-			.collect()
-		for (const version of versions) {
-			await ctx.db.delete("documentVersions", version._id)
-		}
+		// Use Promise.all for parallel independent deletions
+		const [collaborators, versions, presence] = await Promise.all([
+			ctx.db
+				.query("documentCollaborators")
+				.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+				.collect(),
+			ctx.db
+				.query("documentVersions")
+				.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+				.collect(),
+			ctx.db
+				.query("userPresence")
+				.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+				.collect(),
+		])
 
-		const presence = await ctx.db
-			.query("userPresence")
-			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-			.collect()
-		for (const p of presence) {
-			await ctx.db.delete("userPresence", p._id)
-		}
+		// Delete all related records in parallel
+		await Promise.all([
+			...collaborators.map((collab) => ctx.db.delete(collab._id)),
+			...versions.map((version) => ctx.db.delete(version._id)),
+			...presence.map((p) => ctx.db.delete(p._id)),
+		])
 
-		await ctx.db.delete("documents", args.documentId)
+		await ctx.db.delete(args.documentId)
 		return null
 	},
 })
@@ -387,7 +373,10 @@ export const moveDocument = mutation({
 		if (args.targetFolderId) {
 			const folder = await ctx.db.get("folders", args.targetFolderId)
 			if (!folder || folder.ownerId !== user._id) {
-				throw new Error("Target folder not found or access denied")
+				throw new ConvexError({
+					code: "NOT_FOUND",
+					message: "Target folder not found or access denied",
+				})
 			}
 		}
 
@@ -437,37 +426,34 @@ export const emptyTrash = mutation({
 			.withIndex("by_owner_deleted", (q) => q.eq("ownerId", user._id).eq("isDeleted", true))
 			.collect()
 
-		for (const doc of deletedDocs) {
-			// Delete collaborators
-			const collaborators = await ctx.db
-				.query("documentCollaborators")
-				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
-				.collect()
-			for (const collab of collaborators) {
-				await ctx.db.delete("documentCollaborators", collab._id)
-			}
+		// Process each document's deletions in parallel
+		await Promise.all(
+			deletedDocs.map(async (doc) => {
+				// Fetch all related records in parallel
+				const [collaborators, versions, presence] = await Promise.all([
+					ctx.db
+						.query("documentCollaborators")
+						.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+						.collect(),
+					ctx.db
+						.query("documentVersions")
+						.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+						.collect(),
+					ctx.db
+						.query("userPresence")
+						.withIndex("by_document", (q) => q.eq("documentId", doc._id))
+						.collect(),
+				])
 
-			// Delete versions
-			const versions = await ctx.db
-				.query("documentVersions")
-				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
-				.collect()
-			for (const version of versions) {
-				await ctx.db.delete("documentVersions", version._id)
-			}
-
-			// Delete presence
-			const presence = await ctx.db
-				.query("userPresence")
-				.withIndex("by_document", (q) => q.eq("documentId", doc._id))
-				.collect()
-			for (const p of presence) {
-				await ctx.db.delete("userPresence", p._id)
-			}
-
-			// Delete the document
-			await ctx.db.delete("documents", doc._id)
-		}
+				// Delete all related records in parallel
+				await Promise.all([
+					...collaborators.map((collab) => ctx.db.delete(collab._id)),
+					...versions.map((version) => ctx.db.delete(version._id)),
+					...presence.map((p) => ctx.db.delete(p._id)),
+					ctx.db.delete(doc._id),
+				])
+			}),
+		)
 
 		return null
 	},

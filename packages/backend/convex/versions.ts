@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import type { Doc, Id } from "./_generated/dataModel"
 import { internalMutation, mutation, query } from "./_generated/server"
@@ -8,7 +8,12 @@ import { getAuthUserSafe } from "./auth"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 	return user
 }
 
@@ -18,7 +23,12 @@ async function checkDocumentAccess(
 	userId: string,
 ) {
 	const document = await ctx.db.get("documents", documentId)
-	if (!document || document.isDeleted) throw new Error("Document not found")
+	if (!document || document.isDeleted) {
+		throw new ConvexError({
+			code: "NOT_FOUND",
+			message: "Document not found",
+		})
+	}
 
 	if (document.ownerId === userId) return { document, role: "owner" as const }
 
@@ -27,7 +37,12 @@ async function checkDocumentAccess(
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", userId))
 		.unique()
 
-	if (!collaborator) throw new Error("Access denied")
+	if (!collaborator) {
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: "Access denied",
+		})
+	}
 
 	return { document, role: collaborator.role }
 }
@@ -202,7 +217,12 @@ export const restoreVersion = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const version = await ctx.db.get("documentVersions", args.versionId)
-		if (!version) throw new Error("Version not found")
+		if (!version) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Version not found",
+			})
+		}
 
 		const { document } = await checkDocumentAccess(ctx, version.documentId, user._id)
 
@@ -215,7 +235,10 @@ export const restoreVersion = mutation({
 				.unique()
 
 			if (!collaborator || collaborator.role === "viewer") {
-				throw new Error("Editor access required to restore versions")
+				throw new ConvexError({
+					code: "FORBIDDEN",
+					message: "Editor access required to restore versions",
+				})
 			}
 		}
 
@@ -310,11 +333,19 @@ export const deleteVersion = mutation({
 		const user = await getAuthenticatedUser(ctx)
 
 		const version = await ctx.db.get("documentVersions", args.versionId)
-		if (!version) throw new Error("Version not found")
+		if (!version) {
+			throw new ConvexError({
+				code: "NOT_FOUND",
+				message: "Version not found",
+			})
+		}
 
 		const document = await ctx.db.get("documents", version.documentId)
 		if (!document || document.ownerId !== user._id) {
-			throw new Error("Only the document owner can delete versions")
+			throw new ConvexError({
+				code: "FORBIDDEN",
+				message: "Only the document owner can delete versions",
+			})
 		}
 
 		await ctx.db.delete("documentVersions", args.versionId)

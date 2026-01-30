@@ -1,3 +1,5 @@
+import { ConvexError } from "convex/values"
+
 import { ProsemirrorSync } from "@convex-dev/prosemirror-sync"
 
 import { components } from "./_generated/api"
@@ -15,11 +17,17 @@ const prosemirrorSync = new ProsemirrorSync(components.prosemirrorSync)
  */
 function validateDocumentId(id: string): Id<"documents"> {
 	if (!id || typeof id !== "string" || id.trim() === "") {
-		throw new Error("Invalid document ID: must be a non-empty string")
+		throw new ConvexError({
+			code: "VALIDATION_ERROR",
+			message: "Invalid document ID: must be a non-empty string",
+		})
 	}
 
 	if (!/^[a-z0-9]{32}$/.test(id)) {
-		throw new Error(`Invalid document ID format: ${id}`)
+		throw new ConvexError({
+			code: "VALIDATION_ERROR",
+			message: `Invalid document ID format: ${id}`,
+		})
 	}
 
 	return id as Id<"documents">
@@ -28,10 +36,20 @@ function validateDocumentId(id: string): Id<"documents"> {
 async function checkRead(ctx: QueryCtx, id: string): Promise<void> {
 	const documentId = validateDocumentId(id)
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 
 	const document = await ctx.db.get("documents", documentId)
-	if (!document || document.isDeleted) throw new Error("Document not found")
+	if (!document || document.isDeleted) {
+		throw new ConvexError({
+			code: "NOT_FOUND",
+			message: "Document not found",
+		})
+	}
 
 	if (document.ownerId === user._id) return
 
@@ -40,16 +58,31 @@ async function checkRead(ctx: QueryCtx, id: string): Promise<void> {
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", user._id))
 		.unique()
 
-	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
+	if (!collaborator) {
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: "Access denied: You don't have access to this document",
+		})
+	}
 }
 
 async function checkWrite(ctx: MutationCtx, id: string): Promise<void> {
 	const documentId = validateDocumentId(id)
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 
 	const document = await ctx.db.get("documents", documentId)
-	if (!document || document.isDeleted) throw new Error("Document not found")
+	if (!document || document.isDeleted) {
+		throw new ConvexError({
+			code: "NOT_FOUND",
+			message: "Document not found",
+		})
+	}
 
 	if (document.ownerId === user._id) return
 
@@ -58,10 +91,18 @@ async function checkWrite(ctx: MutationCtx, id: string): Promise<void> {
 		.withIndex("by_document_user", (q) => q.eq("documentId", documentId).eq("userId", user._id))
 		.unique()
 
-	if (!collaborator) throw new Error("Access denied: You don't have access to this document")
+	if (!collaborator) {
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: "Access denied: You don't have access to this document",
+		})
+	}
 
 	if (collaborator.role === "viewer") {
-		throw new Error("Access denied: Editor role required")
+		throw new ConvexError({
+			code: "FORBIDDEN",
+			message: "Access denied: Editor role required",
+		})
 	}
 }
 

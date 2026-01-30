@@ -15,6 +15,7 @@ import type * as exports from "../exports.js";
 import type * as folders from "../folders.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
+import type * as lib_utils from "../lib/utils.js";
 import type * as presence from "../presence.js";
 import type * as privateData from "../privateData.js";
 import type * as prosemirror from "../prosemirror.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   folders: typeof folders;
   healthCheck: typeof healthCheck;
   http: typeof http;
+  "lib/utils": typeof lib_utils;
   presence: typeof presence;
   privateData: typeof privateData;
   prosemirror: typeof prosemirror;

@@ -1,4 +1,4 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 
 import { internalMutation, mutation, query } from "./_generated/server"
 import type { MutationCtx } from "./_generated/server"
@@ -7,7 +7,12 @@ import { getAuthUserSafe } from "./auth"
 
 async function getAuthenticatedUser(ctx: MutationCtx) {
 	const user = await getAuthUserSafe(ctx)
-	if (!user) throw new Error("Unauthorized: User not authenticated")
+	if (!user) {
+		throw new ConvexError({
+			code: "UNAUTHORIZED",
+			message: "Unauthorized: User not authenticated",
+		})
+	}
 	return user
 }
 
