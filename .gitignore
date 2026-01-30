@@ -48,3 +48,7 @@ coverage
 .cache
 tmp
 temp
+
+# OpenCode / AI Assistant
+.opencode/
+.agents/
